@@ -1,0 +1,18 @@
+@model dotnetApp.Models.Item
+@{
+    ViewData["Title"] = "Home Page";
+    var message = "Hello from Razor!";
+    var items = new List<string> { "Item1", "Item2", "Item3" };
+}
+
+
+<div class="text-center">
+    This is the name of the item @Model.Name
+</div>
+
+<ul>
+    @foreach (var item in items)
+    {
+        <li>@item</li>
+    }
+</ul>

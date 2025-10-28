@@ -2,7 +2,65 @@
     ViewData["Title"] = "Home Page";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="text-center mt-5">
+    <h1 class="display-4 mb-4">Stock Signal Bot</h1>
+    <p class="text-muted mb-5">Search for a stock to get recommendations</p>
+
+    <div class="d-flex justify-content-center">
+        <div class="position-relative" style="width: 400px;">
+            <input type="text"
+                   id="stockSearch"
+                   class="form-control"
+                   placeholder="Search stocks..."
+                   autocomplete="off" />
+            <ul id="suggestions"
+                class="list-group position-absolute w-100 shadow-sm"
+                style="z-index: 1000; display: none;"></ul>
+        </div>
+    </div>
 </div>
+
+@section Scripts {
+    <script>
+        const stockList = ["BIL.N0000", "HNBF.N0000", "SUN.N0000", "JKH.N0000", "LIOC.N0000"];
+
+        const searchInput = document.getElementById("stockSearch");
+        const suggestionBox = document.getElementById("suggestions");
+
+        searchInput.addEventListener("input", function () {
+            const query = this.value.toUpperCase().trim();
+            suggestionBox.innerHTML = "";
+
+            if (query.length === 0) {
+                suggestionBox.style.display = "none";
+                return;
+            }
+
+            const filtered = stockList.filter(stock => stock.includes(query));
+            if (filtered.length === 0) {
+                suggestionBox.style.display = "none";
+                return;
+            }
+
+            filtered.forEach(stock => {
+                const li = document.createElement("li");
+                li.className = "list-group-item list-group-item-action";
+                li.textContent = stock;
+                li.addEventListener("click", () => {
+                    searchInput.value = stock;
+                    suggestionBox.style.display = "none";
+                    // later: call backend to get stock recommendations
+                });
+                suggestionBox.appendChild(li);
+            });
+
+            suggestionBox.style.display = "block";
+        });
+
+        document.addEventListener("click", function (e) {
+            if (!searchInput.contains(e.target)) {
+                suggestionBox.style.display = "none";
+            }
+        });
+    </script>
+}
