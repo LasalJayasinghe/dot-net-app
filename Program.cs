@@ -1,3 +1,4 @@
+using dotnetApp;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -17,6 +18,8 @@ builder.Host.UseSerilog();
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddHttpClient<StockService>();
+
 
 var app = builder.Build();
 
