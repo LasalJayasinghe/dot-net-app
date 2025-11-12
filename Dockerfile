@@ -2,14 +2,12 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy solution and project files
-COPY *.sln ./
-COPY dotnetApp/*.csproj ./dotnetApp/
+# Copy project files (already inside dotnetApp folder)
+COPY *.csproj ./
 RUN dotnet restore
 
 # Copy all source files
-COPY dotnetApp/. ./dotnetApp/
-WORKDIR /src/dotnetApp
+COPY . ./
 
 # Publish app to /app folder
 RUN dotnet publish -c Release -o /app
