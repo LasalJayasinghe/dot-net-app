@@ -8,15 +8,18 @@
 
     <div class="d-flex justify-content-center">
         <div class="position-relative" style="width: 400px;">
-            <input type="text"
-                   id="stockSearch"
-                   class="form-control"
-                   placeholder="Search stocks..."
-                   autocomplete="off" />
-            <ul id="suggestions"
-                class="list-group position-absolute w-100 shadow-sm"
+            <input type="text" id="stockSearch" class="form-control" placeholder="Search stocks..."
+                autocomplete="off" />
+            <ul id="suggestions" class="list-group position-absolute w-100 shadow-sm"
                 style="z-index: 1000; display: none;"></ul>
         </div>
+
+        <button class="btn btn-primary" id="searchBtn" type="button">Search</button>
+    </div>
+
+    <div section="results" class="mt-4 hidden">
+        <h3 class="stock-name"></h3>
+        <p class="stock-value"></p>
     </div>
 </div>
 
@@ -61,5 +64,35 @@
                 suggestionBox.style.display = "none";
             }
         });
+
+        document.getElementById("searchBtn").addEventListener("click", async () => {
+            const symbol = searchInput.value.trim();
+            if (!symbol) {
+                alert("Please enter a stock symbol.");
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/stock/${symbol}`);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(error.message || "Error fetching stock");
+                    return;
+                }
+
+                const data = await response.json();
+                console.log("Stock Data:", data);
+                const resultsSection = document.querySelector("div[section='results']");
+                resultsSection.querySelector(".stock-name").textContent = `Stock: ${data.name}`;
+                resultsSection.querySelector(".stock-value").textContent = `Last Traded Price: ${data.lastTradedPrice}`;
+                resultsSection.classList.remove("hidden");
+            }
+            catch (err) {
+                console.error(err);
+                alert("Server error. Check your API or network.");
+            }
+        });
+
     </script>
 }

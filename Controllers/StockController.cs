@@ -1,7 +1,8 @@
-using dotnetApp;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 
-namespace MyApp.Namespace
+namespace dotnetApp.Controllers
 {
     [Route("api/[controller]")]
     public class StockController : Controller
@@ -13,16 +14,31 @@ namespace MyApp.Namespace
             _stockService = stockService;
         }
 
+
         [HttpGet("{symbol}")]
         public async Task<IActionResult> GetStock(string symbol)
         {
-            var data = await _stockService.GetStockDataAsync(symbol);
+            var dataObj = await _stockService.GetStockDataAsync(symbol);
 
-            if (data == null)
+            if (dataObj == null)
                 return NotFound(new { message = "Stock not found or API error." });
+            var json = JsonSerializer.Serialize(dataObj);
 
-            return Ok(data);
+            // 2️⃣ Parse JSON string into JsonNode
+            var data = JsonNode.Parse(json);
+
+            // 3️⃣ Extract only the fields you care about
+            var result = new
+            {
+                symbol = data?["reqSymbolInfo"]?["symbol"]?.GetValue<string>(),
+                name = data?["reqSymbolInfo"]?["name"]?.GetValue<string>(),
+                lastTradedPrice = data?["reqSymbolInfo"]?["lastTradedPrice"]?.GetValue<decimal?>()
+            };
+
+
+
+            Console.WriteLine($"Extracted Result: {JsonSerializer.Serialize(result)}");
+            return Ok(result);
         }
-
     }
 }

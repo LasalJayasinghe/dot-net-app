@@ -15,10 +15,6 @@ public class HomeController : Controller
 
     public IActionResult Index()
     {
-        var symbol = "AAPL";
-
-        _logger.LogInformation("Fetching stock data for {symbol}", symbol);
-
         return View();
     }
 
