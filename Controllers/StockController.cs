@@ -23,7 +23,6 @@ namespace dotnetApp.Controllers
             var data = await _stockService.GetStockDataAsync(symbol);
             if (data == null)
                 return NotFound(new { message = "Stock not found or API error." });
-            var json = JsonSerializer.Serialize(dataObj);
 
             var result = new
             {
