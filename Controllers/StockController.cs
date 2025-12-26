@@ -1,8 +1,10 @@
 using dotnetApp;
 using dotnetApp.Models.Dtos;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 
-namespace MyApp.Namespace
+namespace dotnetApp.Controllers
 {
     [Route("api/[controller]")]
     public class StockController : Controller
@@ -14,12 +16,14 @@ namespace MyApp.Namespace
             _stockService = stockService;
         }
 
+
         [HttpGet("{symbol}")]
         public async Task<IActionResult> GetStock(string symbol)
         {
             var data = await _stockService.GetStockDataAsync(symbol);
             if (data == null)
                 return NotFound(new { message = "Stock not found or API error." });
+            var json = JsonSerializer.Serialize(dataObj);
 
             var result = new
             {
@@ -30,6 +34,5 @@ namespace MyApp.Namespace
 
             return Ok(result);
         }
-
     }
 }

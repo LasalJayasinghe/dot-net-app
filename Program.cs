@@ -19,6 +19,8 @@ builder.Host.UseSerilog();
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient<StockService>();
+builder.Services.AddHttpClient<TelegramService>();
+builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
 
 
 var app = builder.Build();
