@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using dotnetApp.Models.Dtos;
 
 namespace dotnetApp;
 
@@ -14,7 +15,7 @@ public class StockService
         _logger = logger;
     }
 
-    public async Task<object?> GetStockDataAsync(string symbol)
+    public async Task<StockDataResponseDto?> GetStockDataAsync(string symbol)
     {
         try
         {
@@ -42,8 +43,7 @@ public class StockService
                 PropertyNameCaseInsensitive = true
             };
 
-            var data = JsonSerializer.Deserialize<object>(content, options);
-
+            var data = JsonSerializer.Deserialize<StockDataResponseDto>(content, options);
             return data;
         }
         catch (HttpRequestException ex)

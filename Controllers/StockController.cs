@@ -1,4 +1,5 @@
 using dotnetApp;
+using dotnetApp.Models.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MyApp.Namespace
@@ -17,11 +18,17 @@ namespace MyApp.Namespace
         public async Task<IActionResult> GetStock(string symbol)
         {
             var data = await _stockService.GetStockDataAsync(symbol);
-
             if (data == null)
                 return NotFound(new { message = "Stock not found or API error." });
 
-            return Ok(data);
+            var result = new
+            {
+                Symbol = data.ReqSymbolInfo.Symbol,
+                Price = data.ReqSymbolInfo.ClosingPrice,
+                LastTradedPrice = data.ReqSymbolInfo.LastTradedPrice
+            };
+
+            return Ok(result);
         }
 
     }
