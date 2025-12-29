@@ -20,6 +20,8 @@ builder.Host.UseSerilog();
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient<StockService>();
 builder.Services.AddHttpClient<TelegramService>();
+builder.Services.AddSingleton<BinanceService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
 
 

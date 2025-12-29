@@ -1,99 +1,146 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Stock Signal Dashboard";
 }
 
-<div class="text-center mt-5">
-    <h1 class="display-4 mb-4">Stock Signal Bot</h1>
-    <p class="text-muted mb-5">Search for a stock to get recommendation</p>
-
-    <div class="d-flex justify-content-center mb-3">
-        <div class="position-relative" style="width: 400px;">
-            <div class="input-group">
-                <input type="text" id="stockSearch" class="form-control" placeholder="Search stocks..."
-                    autocomplete="off" />
-                <button class="btn btn-primary" id="searchButton">Search</button>
-            </div>
-            <ul id="suggestions" class="list-group position-absolute w-100 shadow-sm"
-                style="z-index: 1000; display: none;"></ul>
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h2 class="fw-bold">📈 Stock Signal Bot</h2>
+            <p class="text-muted">
+                Search stocks & monitor live crypto prices in real time
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <img src="https://illustrations.popsy.co/gray/finance-dashboard.svg"
+                 alt="Stock Art"
+                 class="img-fluid"
+                 style="max-height: 140px;">
         </div>
     </div>
 
-    <div section="results" class="mt-4 hidden">
-        <h3 class="stock-name"></h3>
-        <p class="stock-value"></p>
-    </div>
+    <!-- Main Dashboard -->
+    <div class="row g-4">
+        <!-- LEFT: Stock Search -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">🔍 Stock Search</h5>
 
-    <!-- Show stock data here -->
-    <div id="stockResult" class="mt-4"></div>
+                    <div class="input-group mb-3">
+                        <input type="text"
+                               id="stockSearch"
+                               class="form-control"
+                               placeholder="Search stock symbol..."
+                               autocomplete="off">
+                        <button class="btn btn-primary" id="searchButton">
+                            Search
+                        </button>
+                    </div>
+
+                    <ul id="suggestions"
+                        class="list-group position-absolute w-50"
+                        style="z-index:1000; display:none;"></ul>
+
+                    <div id="stockResult" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Crypto Live Prices -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">⚡ Live Crypto Prices</h5>
+
+                    <div class="row text-center" id="cryptoPrices">
+                        <div class="col">
+                            <h6>BTC</h6>
+                            <p class="fw-bold" id="BTCUSDT">--</p>
+                        </div>
+                        <div class="col">
+                            <h6>ETH</h6>
+                            <p class="fw-bold" id="ETHUSDT">--</p>
+                        </div>
+                        <div class="col">
+                            <h6>SOL</h6>
+                            <p class="fw-bold" id="SOLUSDT">--</p>
+                        </div>
+                    </div>
+
+                    <p class="text-muted mt-3" style="font-size: 12px;">
+                        Auto-updates from Binance WebSocket
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
+
 @section Scripts {
-    <script>
-        const stockList = ["BIL.N0000", "HNBF.N0000", "SUN.N0000", "JKH.N0000", "LIOC.N0000"];
-        const searchInput = document.getElementById("stockSearch");
-        const suggestionBox = document.getElementById("suggestions");
-        const searchButton = document.getElementById("searchButton");
-        const stockResult = document.getElementById("stockResult");
+<script>
+    const stockList = ["BIL.N0000", "HNBF.N0000", "SUN.N0000", "JKH.N0000", "LIOC.N0000"];
 
-        // Autocomplete
-        searchInput.addEventListener("input", function () {
-            const query = this.value.toUpperCase().trim();
-            suggestionBox.innerHTML = "";
+    const searchInput = document.getElementById("stockSearch");
+    const suggestionBox = document.getElementById("suggestions");
+    const stockResult = document.getElementById("stockResult");
 
-            if (query.length === 0) {
+    // Autocomplete
+    searchInput.addEventListener("input", () => {
+        const q = searchInput.value.toUpperCase();
+        suggestionBox.innerHTML = "";
+
+        if (!q) return suggestionBox.style.display = "none";
+
+        stockList.filter(s => s.includes(q)).forEach(stock => {
+            const li = document.createElement("li");
+            li.className = "list-group-item list-group-item-action";
+            li.textContent = stock;
+            li.onclick = () => {
+                searchInput.value = stock;
                 suggestionBox.style.display = "none";
-                return;
-            }
-
-            const filtered = stockList.filter(stock => stock.includes(query));
-            if (filtered.length === 0) {
-                suggestionBox.style.display = "none";
-                return;
-            }
-
-            filtered.forEach(stock => {
-                const li = document.createElement("li");
-                li.className = "list-group-item list-group-item-action";
-                li.textContent = stock;
-                li.addEventListener("click", () => {
-                    searchInput.value = stock;
-                    suggestionBox.style.display = "none";
-                });
-                suggestionBox.appendChild(li);
-            });
-
-            suggestionBox.style.display = "block";
+            };
+            suggestionBox.appendChild(li);
         });
 
-        // Hide suggestions when clicking outside
-        document.addEventListener("click", function (e) {
-            if (!searchInput.contains(e.target) && !suggestionBox.contains(e.target)) {
-                suggestionBox.style.display = "none";
+        suggestionBox.style.display = "block";
+    });
+
+    // Stock search
+    document.getElementById("searchButton").onclick = async () => {
+        const symbol = searchInput.value.trim().toUpperCase();
+        if (!symbol) return alert("Enter stock symbol");
+
+        const res = await fetch(`/api/stock/${symbol}`);
+        if (!res.ok) {
+            stockResult.innerHTML = `<p class="text-danger">Stock not found</p>`;
+            return;
+        }
+
+        const data = await res.json();
+        stockResult.innerHTML = `
+            <h6>${data.symbol}</h6>
+            <p>Price: ${data.price}</p>
+            <p>LTP: ${data.lastTradedPrice}</p>
+        `;
+    };
+
+    async function loadCryptoPrices() {
+        try {
+            const res = await fetch("/api/binance");
+            const data = await res.json();
+
+            for (const symbol in data) {
+                const el = document.getElementById(symbol);
+                if (el) el.textContent = data[symbol];
             }
-        });
+        } catch {
+            console.warn("Crypto price fetch failed");
+        }
+    }
 
-        // Search button click
-        searchButton.addEventListener("click", async () => {
-            const symbol = searchInput.value.trim().toUpperCase();
-            if (!symbol) {
-                alert("Please enter a stock symbol");
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/stock/${symbol}`);
-                if (!response.ok) throw new Error("Stock not found");
-
-                const data = await response.json();
-
-                stockResult.innerHTML = `
-                    <h5>Symbol: ${data.symbol}</h5>
-                    <p>Current Price: ${data.price}</p>
-                    <p>Last Traded Price : ${data.lastTradedPrice}</p>
-                `;
-            } catch (err) {
-                stockResult.innerHTML = `<p class="text-danger">Error: ${err.message}</p>`;
-            }
-        });
-    </script>
+    loadCryptoPrices();
+    setInterval(loadCryptoPrices, 3000);
+</script>
 }
