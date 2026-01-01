@@ -47,14 +47,17 @@ public class BinanceService : BackgroundService
     {
         try
         {
-            _logger.LogInformation($"Received Binance message: {json}");
-
             using var doc = JsonDocument.Parse(json);
-            var data = doc.RootElement.GetProperty("data");
 
+            var data = doc.RootElement.GetProperty("data");
             var symbol = data.GetProperty("s").GetString();
 
-            // Parse price safely, because Binance sometimes sends it as string
+            if (string.IsNullOrWhiteSpace(symbol))
+            {
+                _logger.LogWarning("Received ticker update with missing symbol: {Json}", json);
+                return;
+            }
+
             var lastPriceString = data.GetProperty("c").GetString();
             var now = DateTime.UtcNow;
 
