@@ -52,7 +52,7 @@ namespace dotnetApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Alerts");
+                    b.ToTable("Alerts", (string)null);
                 });
 #pragma warning restore 612, 618
         }

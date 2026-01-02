@@ -2,6 +2,7 @@ using dotnetApp;
 using Serilog;
 using Microsoft.EntityFrameworkCore;
 using dotnetApp.Data;
+using Microsoft.AspNetCore.Identity;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -39,9 +40,14 @@ builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<AppDbContext>();
 
 builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
-builder.Services.AddHostedService<AlertJob>(); 
+builder.Services.AddHostedService<AlertJob>();
 
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
+
+builder.Services
+    .AddIdentity<User, IdentityRole>()
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders();
 
 var app = builder.Build();
 
