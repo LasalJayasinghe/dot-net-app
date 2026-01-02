@@ -1,5 +1,7 @@
 using dotnetApp;
 using Serilog;
+using Microsoft.EntityFrameworkCore;
+using dotnetApp.Data;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -13,6 +15,16 @@ Log.Logger = new LoggerConfiguration()
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    var cs = builder.Configuration.GetConnectionString("DefaultConnection");
+
+    options.UseMySql(
+        cs,
+        ServerVersion.AutoDetect(cs)
+    );
+});
+
 // Use Serilog instead of default logging
 builder.Host.UseSerilog();
 
@@ -20,19 +32,44 @@ builder.Host.UseSerilog();
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient<StockService>();
 builder.Services.AddHttpClient<TelegramService>();
-builder.Services.AddSingleton<BinanceService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
-builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
 
+builder.Services.AddSingleton<BinanceService>();
+
+builder.Services.AddScoped<AlertService>();
+builder.Services.AddScoped<AppDbContext>();
+
+builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
+builder.Services.AddHostedService<AlertJob>(); 
+
+builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    try
+    {
+        if (db.Database.CanConnect())
+        {
+            Console.WriteLine("✅ Database connection SUCCESS");
+        }
+        else
+        {
+            Console.WriteLine("❌ Database connection FAILED");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("❌ Database ERROR: " + ex.Message);
+    }
 }
 
 app.UseHttpsRedirection();

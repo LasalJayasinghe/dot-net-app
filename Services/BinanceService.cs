@@ -47,17 +47,18 @@ public class BinanceService : BackgroundService
     {
         try
         {
-            _logger.LogInformation($"Received Binance message: {json}");
-
             using var doc = JsonDocument.Parse(json);
             var data = doc.RootElement.GetProperty("data");
 
             var symbol = data.GetProperty("s").GetString();
 
-            // Parse price safely, because Binance sometimes sends it as string
             var lastPriceString = data.GetProperty("c").GetString();
             var now = DateTime.UtcNow;
 
+            if (string.IsNullOrWhiteSpace(symbol))
+            {
+                return; // or continue
+            }
             // Check throttling
             if (_lastUpdated.TryGetValue(symbol, out var lastTime))
             {
@@ -69,8 +70,7 @@ public class BinanceService : BackgroundService
             {
                 _prices[symbol] = lastPrice;
                 _lastUpdated[symbol] = now;
-
-                _logger.LogInformation($"{symbol} → {lastPrice}");
+                Console.WriteLine($"Updated {symbol} price to {lastPrice}");
             }
             else
             {
