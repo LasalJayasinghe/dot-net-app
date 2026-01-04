@@ -3,6 +3,7 @@ using Serilog;
 using Microsoft.EntityFrameworkCore;
 using dotnetApp.Data;
 using Microsoft.AspNetCore.Identity;
+using dotnetApp.Data.Seeders;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -45,9 +46,30 @@ builder.Services.AddHostedService<AlertJob>();
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
 
 builder.Services
-    .AddIdentity<User, IdentityRole>()
+    .AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("DashboardAccess", policy =>
+        policy.RequireClaim("permission", "dashboard.access"));
+
+    options.AddPolicy("AlertCreate", policy =>
+        policy.RequireClaim("permission", "alert.create"));
+
+    options.AddPolicy("AlertEdit", policy =>
+        policy.RequireClaim("permission", "alert.edit"));
+
+    options.AddPolicy("AlertView", policy =>
+        policy.RequireClaim("permission", "alert.view"));
+});
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    // options.LoginPath = "/Home/login";
+    options.AccessDeniedPath = "/Home/AccessDenied";
+});
 
 var app = builder.Build();
 
@@ -76,15 +98,15 @@ using (var scope = app.Services.CreateScope())
     {
         Console.WriteLine("❌ Database ERROR: " + ex.Message);
     }
+
+    await RoleSeeder.SeedRolesAndPermissionsAsync(scope.ServiceProvider);
 }
 
 app.UseHttpsRedirection();
 app.UseRouting();
-
+app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapStaticAssets();
-
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}")

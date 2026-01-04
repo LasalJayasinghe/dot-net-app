@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace dotnetApp.Data;
 
-public class AppDbContext : IdentityDbContext<User>
+public class AppDbContext : IdentityDbContext<ApplicationUser>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
     public DbSet<Alert> Alerts { get; set; } = null!;
