@@ -11,11 +11,6 @@
    - [In Progress](#in-progress)  
    - [Planned](#planned)  
 3. [Tech Stack](#tech-stack)  
-4. [Setup & Installation](#setup--installation)  
-5. [Usage](#usage)  
-6. [Project Workflow / Personal Notes](#project-workflow--personal-notes)  
-7. [License](#license)
-
 ---
 
 ## Project Overview
