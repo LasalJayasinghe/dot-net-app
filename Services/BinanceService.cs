@@ -48,9 +48,15 @@ public class BinanceService : BackgroundService
         try
         {
             using var doc = JsonDocument.Parse(json);
-            var data = doc.RootElement.GetProperty("data");
 
+            var data = doc.RootElement.GetProperty("data");
             var symbol = data.GetProperty("s").GetString();
+
+            if (string.IsNullOrWhiteSpace(symbol))
+            {
+                _logger.LogWarning("Received ticker update with missing symbol: {Json}", json);
+                return;
+            }
 
             var lastPriceString = data.GetProperty("c").GetString();
             var now = DateTime.UtcNow;
