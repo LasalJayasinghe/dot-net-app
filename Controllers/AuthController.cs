@@ -1,3 +1,4 @@
+using dotnetApp.ViewModels.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
@@ -32,18 +33,28 @@ public class AuthController : Controller
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginDto dto)
+    public async Task<IActionResult> Login(LoginViewModel model)
     {
+
+        Console.WriteLine("Login attempt for: " + model.Password);
         var result = await _signInManager.PasswordSignInAsync(
-            dto.Email,
-            dto.Password,
+            model.Username,
+            model.Password,
             false,
             false
         );
+
+        Console.WriteLine("Login result: " + result.Succeeded);
 
         if (!result.Succeeded)
             return Unauthorized("Invalid login");
 
         return Ok("Logged in");
+    }
+
+    [HttpGet("login")]
+    public IActionResult Login()
+    {
+        return View(new LoginViewModel());
     }
 }

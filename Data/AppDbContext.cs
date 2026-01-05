@@ -20,7 +20,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<IdentityRole>(entity =>
         {
+            entity.Property(r => r.Name).HasMaxLength(191);
             entity.Property(r => r.NormalizedName).HasMaxLength(191);
         });
+
     }
 }
