@@ -134,20 +134,11 @@
         <a asp-controller="Home" asp-action="Index" class="active">
             <i class="fas fa-home"></i><span>Dashboard</span>
         </a>
-        <a href="#">
-            <i class="fas fa-chart-line"></i><span>Markets</span>
-        </a>
-        <a href="#">
+        <a asp-controller="Alert" asp-action="Create">
             <i class="fas fa-bell"></i><span>Alerts</span>
         </a>
-        <a href="#">
-            <i class="fas fa-gear"></i><span>Settings</span>
-        </a>
-    </nav>
 
-    <!-- MAIN -->
-    <div class="main-content">
-        @if (User.Identity?.IsAuthenticated == true)
+         @if (User.Identity?.IsAuthenticated == true)
         {
             <form asp-controller="Auth"
                 asp-action="Logout"
@@ -157,6 +148,10 @@
                 <button type="submit">Logout</button>
             </form>
         }
+    </nav>
+
+    <!-- MAIN -->
+    <div class="main-content">
         
         <!-- TOP BAR -->
         <div class="top-bar">
