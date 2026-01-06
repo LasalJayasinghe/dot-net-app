@@ -81,3 +81,10 @@ The goals of this project are:
 - **Frontend:** Razor Views / Bootstrap (Angular planned)
 
 ---
+
+
+
+<!-- need to  -->
+Registration form
+Alert managing
+Alert related cron
