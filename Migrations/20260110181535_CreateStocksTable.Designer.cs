@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using dotnetApp.Data;
 
@@ -11,9 +12,11 @@ using dotnetApp.Data;
 namespace dotnetApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260110181535_CreateStocksTable")]
+    partial class CreateStocksTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -257,7 +260,7 @@ namespace dotnetApp.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Stocks", b =>
+            modelBuilder.Entity("Stock", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -268,14 +271,17 @@ namespace dotnetApp.Migrations
                     b.Property<decimal>("Change")
                         .HasColumnType("decimal(18,4)");
 
-                    b.Property<decimal>("ClosingPrice")
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<decimal>("High")
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<DateTime>("LastTradedAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<decimal>("Low")
                         .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("MarketCap")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -284,9 +290,6 @@ namespace dotnetApp.Migrations
 
                     b.Property<decimal>("PercentageChange")
                         .HasColumnType("decimal(10,6)");
-
-                    b.Property<decimal>("PreviousClose")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("Price")
                         .HasColumnType("decimal(18,4)");
@@ -301,7 +304,7 @@ namespace dotnetApp.Migrations
                     b.HasIndex("Symbol")
                         .IsUnique();
 
-                    b.ToTable("Stocks");
+                    b.ToTable("Stock");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

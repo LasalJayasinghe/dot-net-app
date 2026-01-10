@@ -1,3 +1,4 @@
+using dotnetApp;
 using Microsoft.Extensions.Hosting;
 
 public class AlertJob : BackgroundService
@@ -16,8 +17,10 @@ public class AlertJob : BackgroundService
             using var scope = _scopeFactory.CreateScope();
 
             var alertService = scope.ServiceProvider.GetRequiredService<AlertService>();
+            var stockService = scope.ServiceProvider.GetRequiredService<StockService>();
 
             await alertService.MonitorAlertsAsync(stoppingToken);
+            await stockService.GetTradingSummaryAsync();
 
             await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
         }

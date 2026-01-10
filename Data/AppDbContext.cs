@@ -8,15 +8,16 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
     public DbSet<Alert> Alerts { get; set; } = null!;
+    public DbSet<Stocks> Stocks { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
-        builder.Entity<IdentityUser>(entity =>
-        {
-            entity.Property(u => u.NormalizedUserName).HasMaxLength(191);
-            entity.Property(u => u.NormalizedEmail).HasMaxLength(191);
-        });
+        // builder.Entity<IdentityUser>(entity =>
+        // {
+        //     entity.Property(u => u.NormalizedUserName).HasMaxLength(191);
+        //     entity.Property(u => u.NormalizedEmail).HasMaxLength(191);
+        // });
 
         builder.Entity<IdentityRole>(entity =>
         {
@@ -24,5 +25,14 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(r => r.NormalizedName).HasMaxLength(191);
         });
 
+        builder.Entity<ApplicationUser>(entity =>
+        {
+            entity.Property(u => u.NormalizedUserName).HasMaxLength(191);
+            entity.Property(u => u.NormalizedEmail).HasMaxLength(191);
+        });
+
+        builder.Entity<Stocks>()
+            .HasIndex(s => s.Symbol)
+            .IsUnique();
     }
 }
