@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace dotnetApp.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class Initialization : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,18 +15,26 @@ namespace dotnetApp.Migrations
             migrationBuilder.AlterDatabase()
                 .Annotation("MySql:CharSet", "utf8mb4");
 
-            migrationBuilder.Sql(@"
-                CREATE TABLE IF NOT EXISTS `Alerts` (
-                    `Id` int NOT NULL AUTO_INCREMENT,
-                    `Symbol` longtext NOT NULL,
-                    `TargetPrice` decimal(65,30) NOT NULL,
-                    `IsAbove` tinyint(1) NOT NULL,
-                    `CreatedAt` datetime(6) NOT NULL,
-                    `IsActive` tinyint(1) NOT NULL,
-                    `CreatedBy` longtext NOT NULL,
-                    PRIMARY KEY (`Id`)
-                ) CHARSET=utf8mb4;
-                ");
+            migrationBuilder.CreateTable(
+                name: "Alerts",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    Symbol = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    TargetPrice = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    IsAbove = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    IsActive = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    CreatedBy = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Alerts", x => x.Id);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
                 name: "AspNetRoles",
@@ -34,7 +42,7 @@ namespace dotnetApp.Migrations
                 {
                     Id = table.Column<string>(type: "varchar(255)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Name = table.Column<string>(type: "varchar(256)", maxLength: 256, nullable: true)
+                    Name = table.Column<string>(type: "varchar(191)", maxLength: 191, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     NormalizedName = table.Column<string>(type: "varchar(191)", maxLength: 191, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
@@ -58,11 +66,11 @@ namespace dotnetApp.Migrations
                     IsActive = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     UserName = table.Column<string>(type: "varchar(256)", maxLength: 256, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    NormalizedUserName = table.Column<string>(type: "varchar(256)", maxLength: 256, nullable: true)
+                    NormalizedUserName = table.Column<string>(type: "varchar(191)", maxLength: 191, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Email = table.Column<string>(type: "varchar(256)", maxLength: 256, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    NormalizedEmail = table.Column<string>(type: "varchar(256)", maxLength: 256, nullable: true)
+                    NormalizedEmail = table.Column<string>(type: "varchar(191)", maxLength: 191, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     EmailConfirmed = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     PasswordHash = table.Column<string>(type: "longtext", nullable: true)
@@ -82,6 +90,30 @@ namespace dotnetApp.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Stocks",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    Symbol = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Name = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Price = table.Column<decimal>(type: "decimal(18,4)", nullable: false),
+                    Change = table.Column<decimal>(type: "decimal(18,4)", nullable: false),
+                    PercentageChange = table.Column<decimal>(type: "decimal(10,6)", nullable: false),
+                    High = table.Column<decimal>(type: "decimal(18,4)", nullable: false),
+                    Low = table.Column<decimal>(type: "decimal(18,4)", nullable: false),
+                    PreviousClose = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    ClosingPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Stocks", x => x.Id);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -248,6 +280,12 @@ namespace dotnetApp.Migrations
                 table: "AspNetUsers",
                 column: "NormalizedUserName",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Stocks_Symbol",
+                table: "Stocks",
+                column: "Symbol",
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -272,7 +310,7 @@ namespace dotnetApp.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
-                name: "IdentityUser");
+                name: "Stocks");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");

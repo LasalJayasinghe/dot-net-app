@@ -12,8 +12,8 @@ using dotnetApp.Data;
 namespace dotnetApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260110181535_CreateStocksTable")]
-    partial class CreateStocksTable
+    [Migration("20260112111407_Initialization")]
+    partial class Initialization
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -260,7 +260,7 @@ namespace dotnetApp.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Stock", b =>
+            modelBuilder.Entity("Stocks", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -271,17 +271,14 @@ namespace dotnetApp.Migrations
                     b.Property<decimal>("Change")
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<decimal>("ClosingPrice")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("High")
                         .HasColumnType("decimal(18,4)");
 
-                    b.Property<DateTime>("LastTradedAt")
-                        .HasColumnType("datetime(6)");
-
                     b.Property<decimal>("Low")
                         .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal>("MarketCap")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -290,6 +287,9 @@ namespace dotnetApp.Migrations
 
                     b.Property<decimal>("PercentageChange")
                         .HasColumnType("decimal(10,6)");
+
+                    b.Property<decimal>("PreviousClose")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("Price")
                         .HasColumnType("decimal(18,4)");
@@ -304,7 +304,7 @@ namespace dotnetApp.Migrations
                     b.HasIndex("Symbol")
                         .IsUnique();
 
-                    b.ToTable("Stock");
+                    b.ToTable("Stocks");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
