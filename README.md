@@ -85,6 +85,7 @@ The goals of this project are:
 
 
 <!-- need to  -->
+move trading summary to  seperate job , use stocks in alert dropdown
 Registration form
 Alert managing
 Alert related cron
