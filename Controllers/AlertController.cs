@@ -10,16 +10,19 @@ namespace dotnetApp.Controllers;
 public class AlertController : Controller
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly StockService _stockService;
     private readonly AppDbContext _dbContext;
-    public AlertController(UserManager<ApplicationUser> userManager, AppDbContext dbContext)
+    public AlertController(UserManager<ApplicationUser> userManager, AppDbContext dbContext , StockService stockService)
     {
         _userManager = userManager;
         _dbContext = dbContext;
+        _stockService = stockService;
     }
 
     [HttpGet]
     public IActionResult Create()
     {
+        ViewBag.StockNames = _stockService.GetAllStockNamesAsync().Result;
         return View();
     }
 

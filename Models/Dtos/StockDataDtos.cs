@@ -19,6 +19,22 @@ public class ReqSymbolInfoDto
 
     [JsonPropertyName("lastTradedPrice")]
     public decimal LastTradedPrice { get; set; }
+
+    [JsonPropertyName("previousClose")]
+    public decimal PreviousClose { get; set; }
+
+    [JsonPropertyName("highTrade")]
+    public decimal High { get; set; }
+
+    [JsonPropertyName("lowTrade")]
+    public decimal Low { get; set; }
+
+    [JsonPropertyName("changePercentage")]
+    public decimal PercentageChange { get; set; }
+
+    [JsonPropertyName("change")]
+    public decimal Change { get; set; }
+
 }
 
 public class TradeSummaryResponseDto

@@ -2,6 +2,8 @@
 using System.Text.Json;
 using dotnetApp.Data;
 using dotnetApp.Models.Dtos;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace dotnetApp;
 
@@ -11,6 +13,7 @@ public class StockService
     private readonly HttpClient _httpClient;
     private readonly ILogger<StockService> _logger;
     private readonly AppDbContext _db;
+    private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions());
 
     public StockService(HttpClient httpClient, ILogger<StockService> logger, AppDbContext db)
     {
@@ -47,6 +50,22 @@ public class StockService
             };
 
             var data = JsonSerializer.Deserialize<StockDataResponseDto>(content, options);
+
+            var existingStock = await _db.Stocks
+                .FirstAsync(s => s.Symbol == symbol);
+
+            if (data != null && existingStock != null)
+            {
+                existingStock.Price = data.ReqSymbolInfo.LastTradedPrice;
+                existingStock.PreviousClose = data.ReqSymbolInfo.PreviousClose;
+                existingStock.High = data.ReqSymbolInfo.High;
+                existingStock.Low = data.ReqSymbolInfo.Low;
+                existingStock.ClosingPrice = data.ReqSymbolInfo.ClosingPrice;
+                existingStock.PercentageChange = data.ReqSymbolInfo.PercentageChange;
+                existingStock.Change = data.ReqSymbolInfo.Change;
+
+                await _db.SaveChangesAsync();
+            }
             return data;
         }
         catch (HttpRequestException ex)
@@ -133,5 +152,27 @@ public class StockService
         {
             Console.WriteLine($"Request error: {ex.Message}");
         }
+    }
+
+    public async Task<List<Stocks>> GetAllStockNamesAsync()
+    {
+        const string cacheKey = "AllStockNames";
+
+        var result = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+            return await _db.Stocks
+                    .AsNoTracking()
+                    .OrderBy(s => s.Name)
+                    .Select(s => new Stocks
+                    {
+                        Id = s.Id,
+                        Name = s.Name
+                    })
+                    .ToListAsync();
+        });
+
+        return result ?? new List<Stocks>();
+
     }
 }
