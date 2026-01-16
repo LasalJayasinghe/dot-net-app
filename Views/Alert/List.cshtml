@@ -1,0 +1,59 @@
+@model List<Alert>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom-0 py-3">
+        <h5 class="mb-0 fw-semibold text-dark">My Alerts</h5>
+        <small class="text-muted">Active stock price alerts</small>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 modern-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Condition</th>
+                    <th>Target Price</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var alert in Model)
+                {
+                    <tr>
+                        <td class="fw-semibold">@alert.Symbol</td>
+                        <td>
+                            <span class="badge bg-light text-dark border">
+                                @(alert.IsAbove ? "Above" : "Below")
+                            </span>
+                        </td>
+                        <td class="fw-medium">@alert.TargetPrice.ToString("N2")</td>
+                        <td>
+                            @if (alert.IsActive)
+                            {
+                                <span class="badge bg-success-subtle text-success">
+                                    Active
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary-subtle text-secondary">
+                                    Inactive
+                                </span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <form asp-action="Delete" asp-controller="Alert" method="post" class="d-inline">
+                                <input type="hidden" name="id" value="@alert.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
