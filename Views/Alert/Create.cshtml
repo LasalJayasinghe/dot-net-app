@@ -1,0 +1,31 @@
+@using dotnetApp.ViewModels.Alerts
+@model AlertViewModel
+
+<div class="container mt-5">
+    <div class="card shadow-sm rounded-4 p-4" style="max-width: 500px; margin:auto;">
+        <h2 class="mb-4 text-center fw-bold">Add New Alert</h2>
+
+        <form asp-action="Create" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="mb-3">
+                <label asp-for="Symbol" class="form-label fw-semibold"></label>
+                <input asp-for="Symbol" class="form-control form-control-lg rounded-3" placeholder="Enter symbol" />
+                <span asp-validation-for="Symbol" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="TargetPrice" class="form-label fw-semibold"></label>
+                <input asp-for="TargetPrice" class="form-control form-control-lg rounded-3" placeholder="Enter target price" />
+                <span asp-validation-for="TargetPrice" class="text-danger small"></span>
+            </div>
+
+            <div class="form-check form-switch mb-3">
+                <input asp-for="IsAbove" class="form-check-input" type="checkbox" />
+                <label asp-for="IsAbove" class="form-check-label">Is Above?</label>
+            </div>
+            
+            <button type="submit" class="btn btn-primary w-100 rounded-3 btn-lg">Create Alert</button>
+        </form>
+    </div>
+</div>

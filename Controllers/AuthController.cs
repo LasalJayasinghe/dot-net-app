@@ -1,6 +1,7 @@
+using dotnetApp.ViewModels.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-
+using Microsoft.AspNetCore.Authorization;
 
 public class AuthController : Controller
 {
@@ -13,7 +14,8 @@ public class AuthController : Controller
         _signInManager = signInManager;
     }
 
-    [HttpPost("register")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Register(RegisterDto dto)
     {
         var user = new ApplicationUser
@@ -31,19 +33,44 @@ public class AuthController : Controller
         return Ok("User created");
     }
 
-    [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginDto dto)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Login(LoginViewModel model)
     {
+        if (!ModelState.IsValid)
+            return View(model);
+
         var result = await _signInManager.PasswordSignInAsync(
-            dto.Email,
-            dto.Password,
+            model.Username,
+            model.Password,
             false,
             false
         );
 
         if (!result.Succeeded)
-            return Unauthorized("Invalid login");
+        {
+            ModelState.AddModelError("", "Invalid email or password");
+            return View(model);
+        }
 
-        return Ok("Logged in");
+        return RedirectToAction("Index", "Home");
+    }
+
+    [HttpGet]
+    public IActionResult Login()
+    {
+        if(User.Identity.IsAuthenticated){
+            return RedirectToAction("Index", "Home");
+        }
+        return View(new LoginViewModel());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize]
+    public async Task<IActionResult> Logout()
+    {
+        await _signInManager.SignOutAsync();
+        return RedirectToAction("Login", "Auth");
     }
 }
