@@ -18,50 +18,61 @@ public class TelegramController : Controller
     }
 
     [HttpPost]
-    public IActionResult Post([FromBody] JsonElement value)
+    public async Task<IActionResult> Post([FromBody] JsonElement value)
     {
+        Console.WriteLine("Received Telegram webhook");
+        if (!value.TryGetProperty("message", out var message))
+            return Ok();
 
-        if (value.TryGetProperty("message", out var message))
+        if (!message.TryGetProperty("text", out var textProp))
+            return Ok();
+
+        var text = textProp.GetString();
+        if (string.IsNullOrWhiteSpace(text))
+            return Ok();
+
+        long chatId = message.GetProperty("chat").GetProperty("id").GetInt64();
+
+        text = text.Trim().ToUpper();
+        var parts = text.Split('-', StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length != 2)
         {
-            string? text = message.GetProperty("text").GetString();
-            long chatId = message.GetProperty("chat").GetProperty("id").GetInt64();
-
-            Console.WriteLine("Message text:" + text);
-
-            if (text != null)
-            {
-                text = text.Trim().ToUpper();
-                var limitValue = text.Split('-')[1];
-                var symbol = text.Split('-')[0];
-
-                Console.WriteLine($"Symbol: {symbol}, Limit: {limitValue}");
-                //Cache ymbol and limitValue  fpr future use , thse casche values will be used for a
-                var dataObj = _stockService.GetStockDataAsync(symbol ?? "");
-
-                if (dataObj == null)
-                    return NotFound(new { message = "Stock not found or API error." });
-                var json = JsonSerializer.Serialize(dataObj);
-                var data = JsonNode.Parse(json);
-
-                var result = new
-                {
-                    symbol = data?["reqSymbolInfo"]?["symbol"]?.GetValue<string>(),
-                    name = data?["reqSymbolInfo"]?["name"]?.GetValue<string>(),
-                    lastTradedPrice = data?["reqSymbolInfo"]?["lastTradedPrice"]?.GetValue<decimal?>()
-                };
-
-                _telegramService.SendMessageAsync($" {result.symbol} last traded price: {result.lastTradedPrice} : {DateTime.Now}").Wait();
-
-                return Ok(new { receivedText = text, chatId });
-
-            }
-            else
-            {
-                Console.WriteLine("No valid text found in the message.");
-                return Ok(new { message = "No valid text found in the message." });
-            }
+            await _telegramService.SendMessageAsync(
+                chatId,
+                "Invalid format. Use: SYMBOL-LIMIT (example: AAPL-150)"
+            );
+            return Ok();
         }
 
-        return Ok(new { message = "Payload received successfully" });
+        var symbol = parts[0];
+        var limitValue = parts[1];
+
+        Console.WriteLine($"Fetching stock data for symbol: {symbol}");
+
+        var dataObj = await _stockService.GetStockDataAsync(symbol +".N0000");
+
+        if (dataObj == null)
+        {
+            await _telegramService.SendMessageAsync(chatId, "Stock not found.");
+            return Ok();
+        }
+
+        var json = JsonSerializer.Serialize(dataObj);
+        var data = JsonNode.Parse(json);
+
+        var result = new
+        {
+            symbol = data?["reqSymbolInfo"]?["symbol"]?.GetValue<string>(),
+            lastTradedPrice = data?["reqSymbolInfo"]?["lastTradedPrice"]?.GetValue<decimal?>()
+        };
+
+        await _telegramService.SendMessageAsync(
+            chatId,
+            $"{result.symbol} last traded price: {result.lastTradedPrice}"
+        );
+
+        return Ok();
     }
+
 }
