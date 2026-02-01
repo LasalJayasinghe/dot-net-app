@@ -1,17 +1,24 @@
 @model List<Alert>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header bg-white border-bottom-0 py-3">
-        <h5 class="mb-0 fw-semibold text-dark">My Alerts</h5>
-        <small class="text-muted">Active stock price alerts</small>
-        <a asp-controller="Alert" asp-action="Create" class="btn btn-primary">
-            Create Alerts
+<div class="card border-0 shadow-sm rounded-4">
+    <!-- Header -->
+    <div class="card-header bg-white border-bottom-0 py-4 px-4 d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-1 fw-semibold text-dark">My Alerts</h5>
+            <small class="text-muted">Active stock price alerts</small>
+        </div>
+
+        <a asp-controller="Alert"
+           asp-action="Create"
+           class="btn btn-primary rounded-pill px-4">
+            + Create Alert
         </a>
     </div>
 
+    <!-- Table -->
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 modern-table">
-            <thead>
+        <table class="table align-middle mb-0 modern-table">
+            <thead class="table-light">
                 <tr>
                     <th>Symbol</th>
                     <th>Condition</th>
@@ -22,37 +29,53 @@
             </thead>
 
             <tbody>
-                @foreach (var alert in Model)
+                @if (Model.Any())
+                {
+                    foreach (var alert in Model)
+                    {
+                        <tr class="table-row">
+                            <td class="fw-semibold text-dark">@alert.Symbol</td>
+
+                            <td>
+                                <span class="badge rounded-pill 
+                                    @(alert.IsAbove ? "bg-info-subtle text-info" : "bg-warning-subtle text-warning")">
+                                    @(alert.IsAbove ? "Above" : "Below")
+                                </span>
+                            </td>
+
+                            <td class="fw-medium">
+                                LKR @alert.TargetPrice.ToString("N2")
+                            </td>
+
+                            <td>
+                                <span class="badge rounded-pill 
+                                    @(alert.IsActive ? "bg-success-subtle text-success" : "bg-secondary-subtle text-secondary")">
+                                    @(alert.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+
+                            <td class="text-end">
+                                <form asp-action="Deactivate"
+                                      asp-controller="Alert"
+                                      method="post"
+                                      class="d-inline">
+                                    <input type="hidden" name="id" value="@alert.Id" />
+
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-danger rounded-circle"
+                                            title="Deactivate alert">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
                 {
                     <tr>
-                        <td class="fw-semibold">@alert.Symbol</td>
-                        <td>
-                            <span class="badge bg-light text-dark border">
-                                @(alert.IsAbove ? "Above" : "Below")
-                            </span>
-                        </td>
-                        <td class="fw-medium">@alert.TargetPrice.ToString("N2")</td>
-                        <td>
-                            @if (alert.IsActive)
-                            {
-                                <span class="badge bg-success-subtle text-success">
-                                    Active
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-secondary-subtle text-secondary">
-                                    Inactive
-                                </span>
-                            }
-                        </td>
-                        <td class="text-end">
-                            <form asp-action="Deactivate" asp-controller="Alert" method="post" class="d-inline">
-                                <input type="hidden" name="id" value="@alert.Id" />
-                                <button type="submit" class="btn btn-sm btn-outline-secondary">
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                            </form>
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            No alerts found. Create your first alert.
                         </td>
                     </tr>
                 }

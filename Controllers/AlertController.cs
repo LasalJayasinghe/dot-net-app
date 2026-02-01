@@ -59,7 +59,7 @@ public class AlertController : Controller
         _dbContext.Alerts.Add(alert);
         await _dbContext.SaveChangesAsync();
 
-        return RedirectToAction("Index", "Home");
+        return RedirectToAction("List", "Alert");
     }
 
     [HttpGet]

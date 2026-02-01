@@ -39,14 +39,14 @@ public class AlertService
                 {
                     await _telegramService.SendMessageAsync(
                         122233, 
-                     $"Alert: {alert.Symbol} has reached the target price of {alert.TargetPrice}. Current price: {existingStock.Price}"
+                     $"Alert: {alert.Symbol} has reached the target price of {alert.TargetPrice:N2}. Current price: {existingStock.Price:N2}"
                  );
 
                     alert.IsActive = false;
                     _dbContext.Alerts.Update(alert);
                     await _dbContext.SaveChangesAsync(stoppingToken);
 
-                    Console.WriteLine($"Alert triggered for {alert.Symbol} at price {existingStock.Price}");
+                    Console.WriteLine($"Alert triggered for {alert.Symbol} at price {existingStock.Price:N2}.");
                 }
                 catch (Exception ex)
                 {

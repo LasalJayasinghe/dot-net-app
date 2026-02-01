@@ -114,4 +114,5 @@ nunit-*.xml
 *.tmp
 *.temp
 ~$*
-appsettings.Development.json
+
+**/appsettings.Development.json
