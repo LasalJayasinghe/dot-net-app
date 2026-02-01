@@ -18,7 +18,7 @@ public class AlertService
     {
         Console.WriteLine("Monitoring alerts...");
         var alerts = await _dbContext.Alerts
-            .Where(alert => !alert.IsActive)
+            .Where(alert => alert.IsActive)
             .ToListAsync(stoppingToken);
 
         foreach (var alert in alerts)
@@ -38,6 +38,7 @@ public class AlertService
                 try
                 {
                     await _telegramService.SendMessageAsync(
+                        122233, 
                      $"Alert: {alert.Symbol} has reached the target price of {alert.TargetPrice}. Current price: {existingStock.Price}"
                  );
 

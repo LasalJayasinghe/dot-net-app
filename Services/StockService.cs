@@ -167,7 +167,8 @@ public class StockService
                     .Select(s => new Stocks
                     {
                         Id = s.Id,
-                        Name = s.Name
+                        Name = s.Name,
+                        Symbol = s.Symbol
                     })
                     .ToListAsync();
         });

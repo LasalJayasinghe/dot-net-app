@@ -10,13 +10,24 @@
 
             <div class="mb-3">
                 <label asp-for="Symbol" class="form-label fw-semibold"></label>
-                <input asp-for="Symbol" class="form-control form-control-lg rounded-3" placeholder="Enter symbol" />
+
+                <select asp-for="Symbol" class="form-select form-select-lg rounded-3">
+                    <option value="">-- Select Stock --</option>
+
+                    @foreach (var stock in Model.StockNames)
+                    {
+                        <option value="@stock.Symbol">@stock.Symbol</option>
+                    }
+                </select>
+
                 <span asp-validation-for="Symbol" class="text-danger small"></span>
             </div>
 
+
             <div class="mb-3">
                 <label asp-for="TargetPrice" class="form-label fw-semibold"></label>
-                <input asp-for="TargetPrice" class="form-control form-control-lg rounded-3" placeholder="Enter target price" />
+                <input asp-for="TargetPrice" class="form-control form-control-lg rounded-3"
+                    placeholder="Enter target price" />
                 <span asp-validation-for="TargetPrice" class="text-danger small"></span>
             </div>
 
@@ -24,7 +35,7 @@
                 <input asp-for="IsAbove" class="form-check-input" type="checkbox" />
                 <label asp-for="IsAbove" class="form-check-label">Is Above?</label>
             </div>
-            
+
             <button type="submit" class="btn btn-primary w-100 rounded-3 btn-lg">Create Alert</button>
         </form>
     </div>

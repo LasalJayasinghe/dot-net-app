@@ -12,7 +12,7 @@ public class AlertController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly StockService _stockService;
     private readonly AppDbContext _dbContext;
-    public AlertController(UserManager<ApplicationUser> userManager, AppDbContext dbContext , StockService stockService)
+    public AlertController(UserManager<ApplicationUser> userManager, AppDbContext dbContext, StockService stockService)
     {
         _userManager = userManager;
         _dbContext = dbContext;
@@ -20,10 +20,13 @@ public class AlertController : Controller
     }
 
     [HttpGet]
-    public IActionResult Create()
+    public async Task<IActionResult> Create()
     {
-        ViewBag.StockNames = _stockService.GetAllStockNamesAsync().Result;
-        return View();
+        var model = new AlertViewModel
+        {
+            StockNames = await _stockService.GetAllStockNamesAsync()
+        };
+        return View(model);
     }
 
     [HttpPost]
@@ -39,6 +42,7 @@ public class AlertController : Controller
 
         if (!ModelState.IsValid)
         {
+            model.StockNames = await _stockService.GetAllStockNamesAsync();
             return View(model);
         }
 
@@ -66,11 +70,11 @@ public class AlertController : Controller
 
         if (user == null)
         {
-            return Challenge(); 
+            return Challenge();
         }
 
         var alerts = await _dbContext.Alerts
-            .AsNoTracking()                 
+            .AsNoTracking()
             .Where(a => a.CreatedBy == user.Id && a.IsActive == true)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
