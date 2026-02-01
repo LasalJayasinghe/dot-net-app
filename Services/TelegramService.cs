@@ -22,8 +22,9 @@ public class TelegramService
         _logger = logger;
     }
 
-    public async Task<bool> SendMessageAsync(string message)
+    public async Task<bool> SendMessageAsync(long chatId ,string message)
     {
+        Console.WriteLine("Sending Telegram message: " + message);
         var url = $"https://api.telegram.org/bot{_settings.BotToken}/sendMessage";
 
         var payload = new
