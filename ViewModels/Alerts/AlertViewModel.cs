@@ -4,6 +4,8 @@ namespace dotnetApp.ViewModels.Alerts;
 
 public class AlertViewModel
 {
+    public int Id { get; set; }
+    
     [Display(Name = "Symbol")]
     public string Symbol { get; set; }
 

@@ -8,15 +8,13 @@
             <small class="text-muted">Active stock price alerts</small>
         </div>
 
-        <a asp-controller="Alert"
-           asp-action="Create"
-           class="btn btn-primary rounded-pill px-4">
+        <a asp-controller="Alert" asp-action="Create" class="btn btn-primary rounded-pill px-4">
             + Create Alert
         </a>
     </div>
 
     <!-- Table -->
-    <div class="table-responsive">
+    <div class="table-responsive p-4">
         <table class="table align-middle mb-0 modern-table">
             <thead class="table-light">
                 <tr>
@@ -37,8 +35,9 @@
                             <td class="fw-semibold text-dark">@alert.Symbol</td>
 
                             <td>
-                                <span class="badge rounded-pill 
-                                    @(alert.IsAbove ? "bg-info-subtle text-info" : "bg-warning-subtle text-warning")">
+                                <span
+                                    class="badge rounded-pill 
+                                                            @(alert.IsAbove ? "bg-info-subtle text-info" : "bg-warning-subtle text-warning")">
                                     @(alert.IsAbove ? "Above" : "Below")
                                 </span>
                             </td>
@@ -48,22 +47,25 @@
                             </td>
 
                             <td>
-                                <span class="badge rounded-pill 
-                                    @(alert.IsActive ? "bg-success-subtle text-success" : "bg-secondary-subtle text-secondary")">
+                                <span
+                                    class="badge rounded-pill 
+                                                            @(alert.IsActive ? "bg-success-subtle text-success" : "bg-secondary-subtle text-secondary")">
                                     @(alert.IsActive ? "Active" : "Inactive")
                                 </span>
                             </td>
 
                             <td class="text-end">
-                                <form asp-action="Deactivate"
-                                      asp-controller="Alert"
-                                      method="post"
-                                      class="d-inline">
+                                <button type="button" class="btn btn-sm btn-outline-primary rounded-circle me-1"
+                                    data-bs-toggle="modal" data-bs-target="#editAlertModal" data-id="@alert.Id"
+                                    data-symbol="@alert.Symbol" data-price="@alert.TargetPrice" data-isabove="@alert.IsAbove">
+                                    <i class="fa fa-pen"></i>
+                                </button>
+
+                                <form asp-action="Deactivate" asp-controller="Alert" method="post" class="d-inline">
                                     <input type="hidden" name="id" value="@alert.Id" />
 
-                                    <button type="submit"
-                                            class="btn btn-sm btn-outline-danger rounded-circle"
-                                            title="Deactivate alert">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle"
+                                        title="Deactivate alert">
                                         <i class="fa fa-trash"></i>
                                     </button>
                                 </form>
@@ -83,3 +85,68 @@
         </table>
     </div>
 </div>
+
+<!-- EDIT ALERT MODAL -->
+<div class="modal fade" id="editAlertModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 shadow">
+
+            <form asp-action="Edit" asp-controller="Alert" method="post">
+                @Html.AntiForgeryToken()
+
+                <input type="hidden" name="Id" id="editAlertId" />
+
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-semibold">Edit Alert</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body px-4">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Symbol</label>
+                        <input type="text" class="form-control" name="Symbol" id="editSymbol" readonly />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Target Price (LKR)</label>
+                        <input type="number" step="0.01" class="form-control" name="TargetPrice" id="editTargetPrice"
+                            required />
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="IsAbove" id="editIsAbove" />
+                        <label class="form-check-label">Is Above?</label>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer border-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">
+                        Save Changes
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const editModal = document.getElementById('editAlertModal');
+
+    editModal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+
+        document.getElementById('editAlertId').value = button.getAttribute('data-id');
+        document.getElementById('editSymbol').value = button.getAttribute('data-symbol');
+        document.getElementById('editTargetPrice').value = button.getAttribute('data-price');
+
+        const isAbove = button.getAttribute('data-isabove') === 'True';
+        document.getElementById('editIsAbove').checked = isAbove;
+    });
+</script>

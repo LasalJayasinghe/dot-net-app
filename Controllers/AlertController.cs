@@ -82,6 +82,8 @@ public class AlertController : Controller
         return View(alerts);
     }
 
+    [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Deactivate(int id)
     {
         var user = await _userManager.GetUserAsync(User);
@@ -104,4 +106,37 @@ public class AlertController : Controller
         return RedirectToAction("List");
     }
 
+
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken] // optional for AJAX with token
+    public async Task<IActionResult> Edit([FromBody] Alert model)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return Unauthorized();
+
+        var alert = await _dbContext.Alerts
+            .FirstOrDefaultAsync(a => a.Id == model.Id && a.CreatedBy == user.Id);
+
+        if (alert == null)
+            return NotFound();
+
+        alert.TargetPrice = model.TargetPrice;
+        alert.IsAbove = model.IsAbove;
+
+        await _dbContext.SaveChangesAsync();
+
+        // Return updated values for frontend to update UI
+        return Ok(new
+        {
+            success = true,
+            id = alert.Id,
+            targetPrice = alert.TargetPrice,
+            isAbove = alert.IsAbove
+        });
+    }
 }
