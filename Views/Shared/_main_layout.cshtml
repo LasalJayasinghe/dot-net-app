@@ -27,7 +27,7 @@
         /* Sidebar */
         .sidebar {
             width: 260px;
-            background: #ececec;
+            background: #ffffff;
             position: fixed;
             top: 0;
             left: 0;
@@ -129,7 +129,9 @@
             <i class="fas fa-chevron-left"></i>
         </button>
 
-        <div class="logo">📊 StocksApp</div>
+        <div class="logo">
+            <img src="~/assets/logo/logo-white.svg" alt="AlertMe Logo" height="40" class="me-2" />
+        </div>
 
         <a asp-controller="Home" asp-action="Index" class="active">
             <i class="fas fa-home"></i><span>Dashboard</span>
@@ -138,12 +140,9 @@
             <i class="fas fa-bell"></i><span>Alerts</span>
         </a>
 
-         @if (User.Identity?.IsAuthenticated == true)
+        @if (User.Identity?.IsAuthenticated == true)
         {
-            <form asp-controller="Auth"
-                asp-action="Logout"
-                method="post"
-                style="display:inline">
+            <form asp-controller="Auth" asp-action="Logout" method="post" style="display:inline">
                 @Html.AntiForgeryToken()
                 <button type="submit">Logout</button>
             </form>
@@ -152,7 +151,7 @@
 
     <!-- MAIN -->
     <div class="main-content">
-        
+
         <!-- TOP BAR -->
         <div class="top-bar">
             <h5 class="mb-0">Market Overview</h5>
