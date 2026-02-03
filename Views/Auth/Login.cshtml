@@ -33,6 +33,18 @@
                         <span asp-validation-for="Password" class="text-danger small"></span>
                     </div>
 
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger">
+                            <ul class="mb-0">
+                                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                                {
+                                    <li>@error.ErrorMessage</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
                     <button type="submit" class="btn btn-primary w-100">
                         Sign In
                     </button>

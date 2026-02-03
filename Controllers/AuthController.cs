@@ -49,7 +49,7 @@ public class AuthController : Controller
 
         if (!result.Succeeded)
         {
-            ModelState.AddModelError("", "Invalid email or password");
+            ModelState.AddModelError("", "Invalid username or password");
             return View(model);
         }
 
