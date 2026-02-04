@@ -7,12 +7,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace dotnetApp.Controllers;
 
+[Authorize]
 public class AlertController : Controller
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly StockService _stockService;
     private readonly AppDbContext _dbContext;
-    public AlertController(UserManager<ApplicationUser> userManager, AppDbContext dbContext, StockService stockService)
+
+    public AlertController(
+        UserManager<ApplicationUser> userManager,
+        AppDbContext dbContext,
+        StockService stockService)
     {
         _userManager = userManager;
         _dbContext = dbContext;
@@ -20,123 +25,27 @@ public class AlertController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Create()
-    {
-        var model = new AlertViewModel
-        {
-            StockNames = await _stockService.GetAllStockNamesAsync()
-        };
-        return View(model);
-    }
-
-    [HttpPost]
-    [Authorize]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(AlertViewModel model)
-    {
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-        {
-            return Challenge();
-        }
-
-        if (!ModelState.IsValid)
-        {
-            model.StockNames = await _stockService.GetAllStockNamesAsync();
-            return View(model);
-        }
-
-        var alert = new Alert
-        {
-            Symbol = model.Symbol,
-            TargetPrice = model.TargetPrice,
-            IsAbove = model.IsAbove,
-            IsActive = true,
-            CreatedBy = user.Id,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _dbContext.Alerts.Add(alert);
-        await _dbContext.SaveChangesAsync();
-
-        return RedirectToAction("List", "Alert");
-    }
-
-    [HttpGet]
     public async Task<IActionResult> List()
     {
-        // 1️⃣ Get logged-in user
         var user = await _userManager.GetUserAsync(User);
-
-        if (user == null)
-        {
-            return Challenge();
-        }
+        if (user == null) return Challenge();
 
         var alerts = await _dbContext.Alerts
             .AsNoTracking()
-            .Where(a => a.CreatedBy == user.Id && a.IsActive == true)
-            .OrderByDescending(a => a.CreatedAt)
+            .Where(a => a.CreatedBy == user.Id)
+            .OrderByDescending(a => a.IsActive)       // Active alerts first
+            .ThenByDescending(a => a.CreatedAt)       // Newest alerts first
             .ToListAsync();
 
-        return View(alerts);
-    }
 
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> Deactivate(int id)
-    {
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        var stockNames = await _stockService.GetAllStockNamesAsync();
+
+        var vm = new AlertsListViewModel
         {
-            return Challenge();
-        }
+            Alerts = alerts,
+            StockNames = stockNames
+        };
 
-        var alert = await _dbContext.Alerts
-            .FirstOrDefaultAsync(a => a.Id == id && a.CreatedBy == user.Id);
-
-        if (alert == null)
-        {
-            return NotFound();
-        }
-
-        alert.IsActive = false;
-        await _dbContext.SaveChangesAsync();
-
-        return RedirectToAction("List");
-    }
-
-
-    [HttpPost]
-    [Authorize]
-    [ValidateAntiForgeryToken] // optional for AJAX with token
-    public async Task<IActionResult> Edit([FromBody] Alert model)
-    {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-            return Unauthorized();
-
-        var alert = await _dbContext.Alerts
-            .FirstOrDefaultAsync(a => a.Id == model.Id && a.CreatedBy == user.Id);
-
-        if (alert == null)
-            return NotFound();
-
-        alert.TargetPrice = model.TargetPrice;
-        alert.IsAbove = model.IsAbove;
-
-        await _dbContext.SaveChangesAsync();
-
-        // Return updated values for frontend to update UI
-        return Ok(new
-        {
-            success = true,
-            id = alert.Id,
-            targetPrice = alert.TargetPrice,
-            isAbove = alert.IsAbove
-        });
+        return View(vm);
     }
 }

@@ -59,7 +59,8 @@ public class AuthController : Controller
     [HttpGet]
     public IActionResult Login()
     {
-        if(User.Identity.IsAuthenticated){
+        if (User?.Identity?.IsAuthenticated == true)
+        {
             return RedirectToAction("Index", "Home");
         }
         return View(new LoginViewModel());
