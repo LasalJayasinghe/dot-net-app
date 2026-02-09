@@ -30,9 +30,23 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Use Serilog instead of default logging
 builder.Host.UseSerilog();
 
+// Memory Cache
+builder.Services.AddMemoryCache();
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddHttpClient<StockService>();
+builder.Services.AddHttpClient<StockService>(client =>
+{
+    client.DefaultRequestHeaders.TryAddWithoutValidation(
+        "Accept", "application/json, text/plain, */*");
+
+    client.DefaultRequestHeaders.TryAddWithoutValidation(
+        "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+
+    client.DefaultRequestHeaders.TryAddWithoutValidation(
+        "Origin", "https://www.cse.lk");
+});
+
 builder.Services.AddHttpClient<TelegramService>();
 
 builder.Services.AddSingleton<BinanceService>();

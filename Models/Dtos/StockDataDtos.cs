@@ -54,3 +54,25 @@ public class TradeSummaryItemDto
     public decimal PercentageChange { get; set; }
     public decimal Change { get; set; }
 }
+
+public class MarketStatusDto
+{
+    public string status { get; set; } = default!;
+}
+
+public class StockTopDto
+{
+    public string symbol { get; set; } = default!;
+    public decimal price { get; set; }
+    public decimal change { get; set; }
+    public decimal changePercentage { get; set; }
+}
+
+public class StockIndicesDto
+{
+    public decimal value { get; set; }
+    public decimal highValue { get; set; }
+    public decimal lowValue { get; set; }
+    public decimal change { get; set; }
+    public decimal percentage { get; set; }
+}
