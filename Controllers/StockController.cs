@@ -1,37 +1,14 @@
-using dotnetApp;
-using dotnetApp.Models.Dtos;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace dotnetApp.Controllers
 {
-    [Route("api/[controller]")]
+    [Authorize]
     public class StockController : Controller
     {
-        private readonly StockService _stockService;
-
-        public StockController(StockService stockService)
+        public IActionResult Index()
         {
-            _stockService = stockService;
-        }
-
-
-        [HttpGet("{symbol}")]
-        public async Task<IActionResult> GetStock(string symbol)
-        {
-            var data = await _stockService.GetStockDataAsync(symbol);
-            if (data == null)
-                return NotFound(new { message = "Stock not found or API error." });
-
-            var result = new
-            {
-                Symbol = data.ReqSymbolInfo.Symbol,
-                Price = data.ReqSymbolInfo.ClosingPrice,
-                LastTradedPrice = data.ReqSymbolInfo.LastTradedPrice
-            };
-
-            return Ok(result);
+            return View();
         }
     }
 }

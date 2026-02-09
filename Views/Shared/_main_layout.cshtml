@@ -1,4 +1,9 @@
-﻿<!DOCTYPE html>
+﻿@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+}
+
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -188,13 +193,19 @@
             <img src="~/assets/logo/icon.png" alt="AlertMe Mini Logo" />
         </div>
 
-
-        <a asp-controller="Home" asp-action="Index" class="active">
+        <a asp-controller="Home" asp-action="Index"
+            class="@(currentController == "Home" && currentAction == "Index" ? "active" : "")">
             <i class="fas fa-home"></i><span>Dashboard</span>
         </a>
-        <a asp-controller="Alert" asp-action="List">
+
+        <a asp-controller="Stock" asp-action="Index" class="@(currentController == "Stock" ? "active" : "")">
+            <i class="fas fa-chart-line"></i><span>Stocks</span>
+        </a>
+
+        <a asp-controller="Alert" asp-action="List" class="@(currentController == "Alert" ? "active" : "")">
             <i class="fas fa-bell"></i><span>Alerts</span>
         </a>
+
 
         @if (User.Identity?.IsAuthenticated == true)
         {
