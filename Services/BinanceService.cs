@@ -31,15 +31,23 @@ public class BinanceService : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var result = await ws.ReceiveAsync(buffer, stoppingToken);
-            if (result.MessageType == WebSocketMessageType.Close)
+            try
             {
-                await ws.ConnectAsync(new Uri(_url), stoppingToken);
-                continue;
-            }
+                var result = await ws.ReceiveAsync(buffer, stoppingToken);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    await ws.ConnectAsync(new Uri(_url), stoppingToken);
+                    continue;
+                }
 
-            var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
-            ProcessMessage(msg);
+                var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                ProcessMessage(msg);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Binance WebSocket connection");
+                await Task.Delay(5000, stoppingToken); // wait before reconnecting
+            }
         }
     }
 
