@@ -20,6 +20,7 @@ public class AlertJob : BackgroundService
             var stockService = scope.ServiceProvider.GetRequiredService<StockService>();
 
             await stockService.GetTradingSummaryAsync();
+            await stockService.GetMarketStatus();
             await alertService.MonitorAlertsAsync(stoppingToken);
             
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);

@@ -1,5 +1,5 @@
-using dotnetApp.Data;
-using dotnetApp.ViewModels.Alerts;
+using dotnetApp.Application.ViewModels.Alerts;
+using dotnetApp.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;

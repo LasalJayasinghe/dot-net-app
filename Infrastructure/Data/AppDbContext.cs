@@ -2,13 +2,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 
-namespace dotnetApp.Data;
+namespace dotnetApp.Infrastructure.Data;
 
 public class AppDbContext : IdentityDbContext<ApplicationUser>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
     public DbSet<Alert> Alerts { get; set; } = null!;
     public DbSet<Stocks> Stocks { get; set; } = null!;
+    public DbSet<MarketStatus> MarketStatus { get; set; } = null!;
+    public DbSet<MarketIndices> MarketIndices { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -34,5 +36,20 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<Stocks>()
             .HasIndex(s => s.Symbol)
             .IsUnique();
+
+        builder.Entity<MarketStatus>(entity =>
+        {
+            entity.ToTable("cse_marketstatus");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedNever();
+        });
+
+        builder.Entity<MarketIndices>(entity =>
+        {
+            entity.ToTable("cse_marketindices");
+        });
     }
 }

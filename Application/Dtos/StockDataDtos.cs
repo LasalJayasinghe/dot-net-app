@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace dotnetApp.Models.Dtos;
+namespace dotnetApp.Application.Dtos;
 
 public class StockDataResponseDto
 {
@@ -39,7 +39,7 @@ public class ReqSymbolInfoDto
 
 public class TradeSummaryResponseDto
 {
-    public List<TradeSummaryItemDto> ReqTradeSummery { get; set; } = [];
+    public List<TradeSummaryItemDto> ReqTradeSummery { get; set; } = new List<TradeSummaryItemDto>();
 }
 
 public class TradeSummaryItemDto
@@ -68,8 +68,11 @@ public class StockTopDto
     public decimal changePercentage { get; set; }
 }
 
+public enum MarketIndexType { ASPI, SNP }
+
 public class StockIndicesDto
 {
+    public MarketIndexType IndexType { get; set; } = MarketIndexType.ASPI;
     public decimal value { get; set; }
     public decimal highValue { get; set; }
     public decimal lowValue { get; set; }

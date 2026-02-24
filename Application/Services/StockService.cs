@@ -1,7 +1,6 @@
-﻿using System.Text;
-using System.Text.Json;
-using dotnetApp.Data;
-using dotnetApp.Models.Dtos;
+﻿using System.Text.Json;
+using dotnetApp.Application.Dtos;
+using dotnetApp.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -12,15 +11,15 @@ public class StockService
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<StockService> _logger;
-    private readonly AppDbContext _db;
     private readonly IMemoryCache _cache;
+    private readonly StockRepository _stockRepository;
 
-    public StockService(HttpClient httpClient, ILogger<StockService> logger, AppDbContext db, IMemoryCache cache
+    public StockService(HttpClient httpClient, ILogger<StockService> logger, StockRepository stockRepository, IMemoryCache cache
     )
     {
         _httpClient = httpClient;
         _logger = logger;
-        _db = db;
+        _stockRepository = stockRepository;
         _cache = cache;
     }
 
@@ -49,8 +48,7 @@ public class StockService
 
             var data = JsonSerializer.Deserialize<StockDataResponseDto>(content, options);
 
-            var existingStock = await _db.Stocks
-                .FirstAsync(s => s.Symbol == symbol);
+            var existingStock = await _stockRepository.GetBySymbolAsync(symbol);
 
             if (data != null && existingStock != null)
             {
@@ -62,7 +60,7 @@ public class StockService
                 existingStock.PercentageChange = data.ReqSymbolInfo.PercentageChange;
                 existingStock.Change = data.ReqSymbolInfo.Change;
 
-                await _db.SaveChangesAsync();
+                await _stockRepository.SaveChangesAsync();
             }
             return data;
         }
@@ -94,9 +92,8 @@ public class StockService
             var symbols = stockItems.ReqTradeSummery.Select(s => s.Symbol).ToList();
 
             // Fetch existing stocks in one query
-            var existingStocks = await _db.Stocks
-                .Where(s => symbols.Contains(s.Symbol))
-                .ToDictionaryAsync(s => s.Symbol);
+            var existingStocks = await _stockRepository.GetBySymbolsAsync(symbols)
+                .ContinueWith(t => t.Result.ToDictionary(s => s.Symbol, s => s));
 
             int batchSize = 50;
             for (int i = 0; i < stockItems.ReqTradeSummery.Count; i += batchSize)
@@ -120,7 +117,7 @@ public class StockService
                     else
                     {
                         // Insert new stock
-                        _db.Stocks.Add(new Stocks
+                        await _stockRepository.AddAsync(new Stocks
                         {
                             Symbol = item.Symbol,
                             Name = item.Name,
@@ -136,7 +133,7 @@ public class StockService
                 }
 
                 // Save batch
-                await _db.SaveChangesAsync();
+                await _stockRepository.SaveChangesAsync();
             }
 
             _logger.LogInformation("Trading Summary Data updated at {Time}", DateTime.Now);
@@ -159,27 +156,17 @@ public class StockService
         var result = await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
-            return await _db.Stocks
-                    .AsNoTracking()
-                    .OrderBy(s => s.Name)
-                    .Select(s => new Stocks
-                    {
-                        Id = s.Id,
-                        Name = s.Name,
-                        Symbol = s.Symbol
-                    })
-                    .ToListAsync();
+            return await _stockRepository.GetAllStockNamesAsync();
         });
 
         return result ?? new List<Stocks>();
-
     }
 
     public async Task<MarketStatusDto?> GetMarketStatus()
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://www.cse.lk/api/marketStatus");
+            var response = await _httpClient.PostAsync("https://www.cse.lk/api/marketStatus", null);
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
@@ -189,6 +176,29 @@ public class StockService
             };
 
             var marketStatus = JsonSerializer.Deserialize<MarketStatusDto>(content, options);
+            bool IsTradingDay = DateTime.UtcNow.DayOfWeek != DayOfWeek.Saturday && DateTime.UtcNow.DayOfWeek != DayOfWeek.Sunday;
+
+            if (marketStatus == null)
+                return null;
+
+            bool isTradingDay = DateTime.UtcNow.DayOfWeek != DayOfWeek.Saturday &&
+                                DateTime.UtcNow.DayOfWeek != DayOfWeek.Sunday;
+
+            var entity = await _stockRepository.GetMarketStatusAsync();
+
+            if (entity == null)
+            {
+                entity = new MarketStatus { Id = 1 };
+                 _stockRepository.Add(entity);
+            }
+
+            entity.IsTradingDay = isTradingDay;
+            entity.IsOpen = marketStatus.status != "Market Closed";
+            entity.UpdatedAt = DateTime.UtcNow;
+
+            await _stockRepository.SaveChangesAsync();
+
+            Console.WriteLine($"Market Status: {marketStatus?.status} at {DateTime.Now}");
             return marketStatus;
         }
         catch (HttpRequestException ex)
@@ -244,11 +254,11 @@ public class StockService
         }
     }
 
-    public async Task<List<StockIndicesDto>?> GetASPIData()
+    public async Task<StockIndicesDto?> GetASPIData()
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://www.cse.lk/api/aspiData");
+            var response = await _httpClient.PostAsync("https://www.cse.lk/api/aspiData", null);
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
@@ -257,8 +267,26 @@ public class StockService
                 PropertyNameCaseInsensitive = true
             };
 
-            var aspiData = JsonSerializer.Deserialize<List<StockIndicesDto>>(content, options);
-            return aspiData ?? new List<StockIndicesDto>();
+            var aspiData = JsonSerializer.Deserialize<StockIndicesDto>(content, options)
+                           ?? new StockIndicesDto();
+
+            aspiData.IndexType = Application.Dtos.MarketIndexType.ASPI;
+
+            var entity = await _stockRepository.GetMarketIndexAsync(MarketIndexType.ASPI);
+
+            if (entity == null)
+            {
+                entity = new MarketIndices { IndexType = MarketIndexType.ASPI };
+                _stockRepository.Add(entity);
+            }
+
+            // entity.IsTradingDay = isTradingDay;
+            // entity.IsOpen = marketStatus.status != "Market Closed";
+            // entity.UpdatedAt = DateTime.UtcNow;
+
+            await _stockRepository.SaveChangesAsync();
+
+            return aspiData;
         }
         catch (HttpRequestException ex)
         {
@@ -271,7 +299,7 @@ public class StockService
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://www.cse.lk/api/snpData");
+            var response = await _httpClient.PostAsync("https://www.cse.lk/api/snpData", null);
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();

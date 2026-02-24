@@ -1,5 +1,5 @@
 using dotnetApp;
-using dotnetApp.Data;
+using dotnetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 public class AlertService

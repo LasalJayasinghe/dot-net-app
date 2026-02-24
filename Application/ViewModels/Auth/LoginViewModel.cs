@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace dotnetApp.ViewModels.Auth;
+namespace dotnetApp.Application.ViewModels.Auth;
 public class LoginViewModel
 {
     [Required(ErrorMessage = "Username is required")]

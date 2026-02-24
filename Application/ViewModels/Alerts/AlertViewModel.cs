@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace dotnetApp.ViewModels.Alerts;
+namespace dotnetApp.Application.ViewModels.Alerts;
 
 public class AlertCreateViewModel
 {

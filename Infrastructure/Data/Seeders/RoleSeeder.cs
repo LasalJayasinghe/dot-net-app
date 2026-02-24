@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 
-namespace dotnetApp.Data.Seeders
+namespace dotnetApp.Infrastructure.Data.Seeders
 {
     public static class RoleSeeder
     {
