@@ -106,7 +106,7 @@
         const symbol = searchInput.value.trim().toUpperCase();
         if (!symbol) return alert("Enter stock symbol");
 
-        const res = await fetch(`/api/stock/${symbol}`);
+        const res = await fetch(`/api/stocks/${symbol}`);
         if (!res.ok) {
             stockResult.innerHTML = `<p class="text-danger">Stock not found</p>`;
             return;

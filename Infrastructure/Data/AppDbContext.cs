@@ -51,5 +51,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.ToTable("cse_marketindices");
         });
+
+        builder.Entity<MarketIndices>()
+            .Property(e => e.IndexType)
+            .HasConversion<string>();
     }
 }

@@ -175,31 +175,16 @@ public class StockService
                 PropertyNameCaseInsensitive = true
             };
 
-            var marketStatus = JsonSerializer.Deserialize<MarketStatusDto>(content, options);
-            bool IsTradingDay = DateTime.UtcNow.DayOfWeek != DayOfWeek.Saturday && DateTime.UtcNow.DayOfWeek != DayOfWeek.Sunday;
-
-            if (marketStatus == null)
-                return null;
-
-            bool isTradingDay = DateTime.UtcNow.DayOfWeek != DayOfWeek.Saturday &&
-                                DateTime.UtcNow.DayOfWeek != DayOfWeek.Sunday;
-
-            var entity = await _stockRepository.GetMarketStatusAsync();
-
-            if (entity == null)
+            var marketStatusDto = JsonSerializer.Deserialize<MarketStatusDto>(content, options);
+            var marketStatus = new MarketStatus
             {
-                entity = new MarketStatus { Id = 1 };
-                 _stockRepository.Add(entity);
-            }
+                IsOpen = marketStatusDto?.status != "Market Closed"
+            };
 
-            entity.IsTradingDay = isTradingDay;
-            entity.IsOpen = marketStatus.status != "Market Closed";
-            entity.UpdatedAt = DateTime.UtcNow;
+            await _stockRepository.AddAsync(marketStatus);
 
-            await _stockRepository.SaveChangesAsync();
-
-            Console.WriteLine($"Market Status: {marketStatus?.status} at {DateTime.Now}");
-            return marketStatus;
+            Console.WriteLine($"Market Status: {marketStatusDto?.status} at {DateTime.Now}");
+            return marketStatusDto;
         }
         catch (HttpRequestException ex)
         {
@@ -269,23 +254,19 @@ public class StockService
 
             var aspiData = JsonSerializer.Deserialize<StockIndicesDto>(content, options)
                            ?? new StockIndicesDto();
+            Console.WriteLine($"ASPI Data: {aspiData.IndexType} - Price: {aspiData.value}, Change: {aspiData.change}, Change%: {aspiData.percentage} at {DateTime.Now}");
 
-            aspiData.IndexType = Application.Dtos.MarketIndexType.ASPI;
-
-            var entity = await _stockRepository.GetMarketIndexAsync(MarketIndexType.ASPI);
-
-            if (entity == null)
+            var marketIndex = new MarketIndices
             {
-                entity = new MarketIndices { IndexType = MarketIndexType.ASPI };
-                _stockRepository.Add(entity);
-            }
+                IndexType = MarketIndexType.ASPI,
+                Value = aspiData.value,
+                HighValue = aspiData.highValue,
+                LowValue = aspiData.lowValue,
+                Change = aspiData.change,
+                Percentage = aspiData.percentage
+            };
 
-            // entity.IsTradingDay = isTradingDay;
-            // entity.IsOpen = marketStatus.status != "Market Closed";
-            // entity.UpdatedAt = DateTime.UtcNow;
-
-            await _stockRepository.SaveChangesAsync();
-
+            await _stockRepository.AddAsync(marketIndex);
             return aspiData;
         }
         catch (HttpRequestException ex)
@@ -295,7 +276,7 @@ public class StockService
         }
     }
 
-    public async Task<List<StockIndicesDto>?> GetSnpData()
+    public async Task<StockIndicesDto> GetSnpData()
     {
         try
         {
@@ -308,8 +289,19 @@ public class StockService
                 PropertyNameCaseInsensitive = true
             };
 
-            var snpData = JsonSerializer.Deserialize<List<StockIndicesDto>>(content, options);
-            return snpData ?? new List<StockIndicesDto>();
+            var snpData = JsonSerializer.Deserialize<StockIndicesDto>(content, options);
+            var marketIndex = new MarketIndices
+            {
+                IndexType = MarketIndexType.SNP,
+                Value = snpData.value,
+                HighValue = snpData.highValue,
+                LowValue = snpData.lowValue,
+                Change = snpData.change,
+                Percentage = snpData.percentage
+            };
+
+            await _stockRepository.AddAsync(marketIndex);
+            return snpData;
         }
         catch (HttpRequestException ex)
         {
@@ -317,6 +309,4 @@ public class StockService
             return null;
         }
     }
-
-
 }

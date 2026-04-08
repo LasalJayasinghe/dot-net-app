@@ -49,6 +49,7 @@ builder.Services.AddHttpClient<StockService>(client =>
 });
 
 builder.Services.AddScoped<StockRepository>();
+builder.Services.AddScoped<AlertRepository>();
 
 builder.Services.AddScoped<AppDbContext>();
 

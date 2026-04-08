@@ -21,6 +21,8 @@ public class AlertJob : BackgroundService
 
             await stockService.GetTradingSummaryAsync();
             await stockService.GetMarketStatus();
+            await stockService.GetASPIData();
+            await stockService.GetSnpData();
             await alertService.MonitorAlertsAsync(stoppingToken);
             
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);

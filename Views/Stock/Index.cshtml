@@ -1,11 +1,54 @@
+@model MarketViewModel
+@{
+    ViewData["Title"] = "Stocks";
+}
+
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h2 class="fw-bold">📈 Stock Portfolio</h2>
+            <p class="text-muted">
+                Track and manage your stock investments with real-time data and insights
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            @if (Model.Status != null)
+            {
+                <span class="badge @(Model.Status.IsOpen ? "bg-success" : "bg-danger")">
+                    @(Model.Status.IsOpen ? "Market Open" : "Market Closed")
+                </span>
+                <span class="badge @(Model.Status.IsTradingDay ? "bg-primary" : "bg-secondary")">
+                    @(Model.Status.IsTradingDay ? "Trading Day" : "Non-Trading Day")
+                </span>
+            }
+        </div>
+    </div>
+</div>
+
 <div class="container-fluid px-4">
 
-    <!-- 🔹 Top Full-Width Component (CORRECT AS IS) -->
+    <!-- 🔹 Top Full-Width Component: Market Indices -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-body py-3">
-                    <!-- Top component content -->
+                    <div class="row text-center">
+                        <div class="col-md-6">
+                            <h5>ASPI</h5>
+                            <p class="h4 mb-1">@Model.Aspi?.Value.ToString("N2")</p>
+                            <span class="badge @(Model.Aspi?.Change >= 0 ? "bg-success" : "bg-danger")">
+                                @(Model.Aspi?.Change >= 0 ? "+" : "")@Model.Aspi?.Percentage.ToString("N2")%
+                            </span>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>S&P 500</h5>
+                            <p class="h4 mb-1">@Model.Snp?.Value.ToString("N2")</p>
+                            <span class="badge @(Model.Snp?.Change >= 0 ? "bg-success" : "bg-danger")">
+                                @(Model.Snp?.Change >= 0 ? "+" : "")@Model.Snp?.Percentage.ToString("N2")%
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -14,27 +57,19 @@
     <!-- 🔹 Content Area -->
     <div class="row">
 
-        <!-- ⬅️ Left Side: ONE column, block after block -->
+        <!-- ⬅️ Left Side -->
         <div class="col-lg-9 col-md-8">
-            
-            <!-- Block 1 -->
-            <div class="card border-0 shadow-sm rounded-4 mb-4">
-                <div class="card-body">
-                    <!-- Block content -->
-                </div>
-            </div>
 
-            <!-- Block 2 -->
+            <!-- Example Block 1 -->
             <div class="card border-0 shadow-sm rounded-4 mb-4">
                 <div class="card-body">
-                    <!-- Block content -->
-                </div>
-            </div>
-
-            <!-- Block 3 -->
-            <div class="card border-0 shadow-sm rounded-4 mb-4">
-                <div class="card-body">
-                    <!-- Block content -->
+                    <p>High/Low Values:</p>
+                    <ul>
+                        <li>ASPI High: @Model.Aspi?.HighValue.ToString("N2")</li>
+                        <li>ASPI Low: @Model.Aspi?.LowValue.ToString("N2")</li>
+                        <li>S&P 500 High: @Model.Snp?.HighValue.ToString("N2")</li>
+                        <li>S&P 500 Low: @Model.Snp?.LowValue.ToString("N2")</li>
+                    </ul>
                 </div>
             </div>
 
@@ -42,12 +77,15 @@
 
         </div>
 
-        <!-- ➡️ Right Side: FULL SCREEN HEIGHT Wishlist -->
+        <!-- ➡️ Right Side: Sidebar -->
         <div class="col-lg-3 col-md-4">
             <div class="position-sticky" style="top: 90px;">
                 <div class="card border-0 shadow-sm rounded-4" style="min-height: calc(100vh - 120px);">
                     <div class="card-body">
-                        <!-- Wishlist / sidebar content -->
+                        @* <h5>Market Status</h5>
+                        <p>Open Time: @Model.Status?.OpenTime?.ToLocalTime().ToString("HH:mm")</p>
+                        <p>Close Time: @Model.Status?.CloseTime?.ToLocalTime().ToString("HH:mm")</p>
+                        <p>Last Updated: @Model.Status?.UpdatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</p> *@
                     </div>
                 </div>
             </div>
