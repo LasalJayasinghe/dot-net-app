@@ -309,4 +309,9 @@ public class StockService
             return null;
         }
     }
+
+    public async Task<List<StockIntraDay>?> GetIntradayDataAsync()
+    {
+        return await _stockRepository.GetIntraDayValues();
+    }
 }

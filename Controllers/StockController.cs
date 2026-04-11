@@ -19,7 +19,6 @@ namespace dotnetApp.Controllers
             var SnpData = await _stockRepository.GetMarketIndexAsync(MarketIndexType.SNP);
             var marketStatus = await _stockRepository.GetMarketStatusAsync();
 
-            // Pass a model to the view
             var model = new MarketViewModel
             {
                 Aspi = AspiData,

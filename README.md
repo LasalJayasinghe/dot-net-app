@@ -5,28 +5,33 @@
 ---
 
 ## Table of Contents
-1. [Project Overview](#project-overview)  
-2. [Features](#features)  
-   - [Completed](#completed)  
-   - [In Progress](#in-progress)  
-   - [Planned](#planned)  
-3. [Tech Stack](#tech-stack)  
+
+1. [Project Overview](#project-overview)
+2. [Features](#features)
+   - [Completed](#completed)
+   - [In Progress](#in-progress)
+   - [Planned](#planned)
+3. [Tech Stack](#tech-stack)
+
 ---
 
 ## Project Overview
-This application is designed for **tracking financial data**, including stocks and cryptocurrencies, and sending notifications via **Telegram**.  
 
-The goals of this project are:  
-- Practice backend development with **.NET MVC**  
-- Integrate real-time APIs for finance data  
-- Implement logging, authentication, and notifications  
-- Build a personal platform for testing trading strategies  
+This application is designed for **tracking financial data**, including stocks and cryptocurrencies, and sending notifications via **Telegram**.
+
+The goals of this project are:
+
+- Practice backend development with **.NET MVC**
+- Integrate real-time APIs for finance data
+- Implement logging, authentication, and notifications
+- Build a personal platform for testing trading strategies
 
 ---
 
 ## Features
 
 ### Completed
+
 - **Logging**
   - Serilog implemented
   - Daily log files created automatically
@@ -49,6 +54,7 @@ The goals of this project are:
 ---
 
 ### In Progress
+
 - **Alert System**
   - Notifications based on CSE data
   - Telegram integration for alerts
@@ -62,10 +68,11 @@ The goals of this project are:
 ---
 
 ### Planned / Future
+
 - Advanced **user roles and permissions**
 - **Historical data analytics** with charts
-- Additional notification channels: Email, Push  
-- **Dashboard**: portfolio overview, live prices, alert summary  
+- Additional notification channels: Email, Push
+- **Dashboard**: portfolio overview, live prices, alert summary
 - **Unit & Integration testing**
 - **Dockerization / Deployment scripts**
 - Automated **daily MySQL backups**
@@ -73,19 +80,33 @@ The goals of this project are:
 ---
 
 ## Tech Stack
-- **Backend:** .NET 9 MVC  
-- **Database:** MySQL  
-- **Logging:** Serilog  
-- **APIs:** CSE API, Binance WebSocket API  
-- **Notifications:** Telegram Bot API  
+
+- **Backend:** .NET 9 MVC
+- **Database:** MySQL
+- **Logging:** Serilog
+- **APIs:** CSE API, Binance WebSocket API
+- **Notifications:** Telegram Bot API
 - **Frontend:** Razor Views / Bootstrap (Angular planned)
 
 ---
 
+<!--
 
+Void : no async - no return
+Task : async - no return
+Task<type(int : string)> : async - return
 
-<!-- need to  -->
-move trading summary to  seperate job , use stocks in alert dropdown
-Registration form
-Alert managing
-Alert related cron
+If you're building APIs →
+👉 use Task<ActionResult<T>>
+If you're writing services →
+👉 use Task<T>
+If you're writing sync logic →
+👉 use void or normal return types
+Never casually use async void
+🚀 Quick mental model
+void → “just run this”
+Task → “run this async”
+Task<T> → “run async and give me result”
+IActionResult → “return HTTP response”
+
+ -->

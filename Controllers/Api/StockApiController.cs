@@ -1,3 +1,4 @@
+using dotnetApp.Application.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -30,5 +31,15 @@ public class StockApiController : ControllerBase
         };
 
         return Ok(result);
+    }
+
+    [HttpGet("intraday")]
+    public async Task<IActionResult> GetIntradayData()
+    {
+        var data = await _stockService.GetIntradayDataAsync();
+        if (data == null)
+            return NotFound(new { message = "Intraday data not found or API error." });
+
+        return Ok(data);
     }
 }

@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using dotnetApp.Application.Dtos;
 using dotnetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -101,4 +102,20 @@ public class StockRepository
     public Task SaveChangesAsync() => _db.SaveChangesAsync();
 
     #endregion
+
+    public async Task<List<StockIntraDay>?> GetIntraDayValues()
+    {
+        return await _db.Stocks
+            .AsNoTracking()
+            .Select(s => new StockIntraDay
+            {
+                symbol = s.Symbol,
+                price = s.ClosingPrice,
+                percentage = ((s.High - s.Low) / s.Low) * 100
+            })
+            .OrderByDescending(s => s.percentage)
+            .Take(50)
+            .ToListAsync();
+
+    }
 }
