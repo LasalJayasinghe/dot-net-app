@@ -116,3 +116,4 @@ nunit-*.xml
 ~$*
 
 **/appsettings.Development.json
+appsettings.json

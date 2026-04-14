@@ -1,0 +1,250 @@
+@model MarketViewModel
+@{
+    ViewData["Title"] = "Stocks";
+}
+
+<style>
+    /* =======================
+       MARKET THEME UI
+    ======================= */
+
+    body {
+        background: #f4f6fb;
+    }
+
+    .market-header {
+        background: white;
+        border-radius: 14px;
+        padding: 20px;
+    }
+
+    .badge-soft {
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+    }
+
+    /* Intraday Panel */
+    .intraday-card {
+        background: #0f172a;
+        color: #e5e7eb;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .intraday-header {
+        padding: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .intraday-list {
+        max-height: 520px;
+        overflow-y: auto;
+    }
+
+    .stock-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        transition: 0.2s;
+    }
+
+    .stock-row:hover {
+        background: rgba(255,255,255,0.04);
+        transform: translateX(4px);
+    }
+
+    .stock-symbol {
+        font-weight: 600;
+        letter-spacing: 0.4px;
+    }
+
+    .stock-price {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    .stock-change {
+        font-weight: 700;
+    }
+
+    .up {
+        color: #22c55e;
+        text-shadow: 0 0 10px rgba(34,197,94,0.15);
+    }
+
+    .down {
+        color: #ef4444;
+        text-shadow: 0 0 10px rgba(239,68,68,0.15);
+    }
+
+</style>
+
+<!-- ===================== HEADER ===================== -->
+<div class="container-fluid mt-4">
+    <div class="market-header d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h3 class="fw-bold mb-1">📈 Stock Portfolio</h3>
+            <p class="text-muted mb-0">
+                Live market dashboard
+            </p>
+        </div>
+
+        <div class="text-end">
+            @if (Model.Status != null)
+            {
+                <span class="badge @(Model.Status.IsOpen ? "bg-success" : "bg-danger")">
+                    @(Model.Status.IsOpen ? "Market Open" : "Market Closed")
+                </span>
+
+                <span class="badge @(Model.Status.IsTradingDay ? "bg-primary" : "bg-secondary")">
+                    @(Model.Status.IsTradingDay ? "Trading Day" : "Non-Trading Day")
+                </span>
+            }
+        </div>
+
+    </div>
+</div>
+
+<!-- ===================== MARKET INDICES ===================== -->
+<div class="container-fluid px-4 mb-4">
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">
+            <div class="row text-center">
+
+                <div class="col-md-6">
+                    <h6 class="text-muted">ASPI</h6>
+                    <h4 class="fw-bold">@Model.Aspi?.Value.ToString("N2")</h4>
+                    <span class="badge @(Model.Aspi?.Change >= 0 ? "bg-success" : "bg-danger")">
+                        @(Model.Aspi?.Change >= 0 ? "+" : "")@Model.Aspi?.Percentage.ToString("N2")%
+                    </span>
+                </div>
+
+                <div class="col-md-6">
+                    <h6 class="text-muted">S&P 500</h6>
+                    <h4 class="fw-bold">@Model.Snp?.Value.ToString("N2")</h4>
+                    <span class="badge @(Model.Snp?.Change >= 0 ? "bg-success" : "bg-danger")">
+                        @(Model.Snp?.Change >= 0 ? "+" : "")@Model.Snp?.Percentage.ToString("N2")%
+                    </span>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===================== MAIN CONTENT ===================== -->
+<div class="container-fluid px-4">
+
+    <div class="row">
+
+        <!-- LEFT SIDE -->
+        <div class="col-lg-9">
+
+            <!-- INTRADAY MODULE -->
+            <div class="intraday-card mb-4">
+
+                <div class="intraday-header">
+                    <div>
+                        <h6 class="mb-0">🔥 Intraday Movers</h6>
+                        <small class="text-muted">Live scanner</small>
+                    </div>
+
+                    <button class="btn btn-sm btn-light" onclick="loadIntraday()">
+                        ↻ Refresh
+                    </button>
+                </div>
+
+                <div id="intraday-loader" class="text-center py-4 d-none">
+                    <div class="spinner-border spinner-border-sm text-light"></div>
+                    <div class="small text-muted mt-2">Loading market data...</div>
+                </div>
+
+                <div id="intraday-container" class="intraday-list"></div>
+
+            </div>
+
+        </div>
+
+        <!-- RIGHT SIDEBAR -->
+        <div class="col-lg-3">
+
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body">
+                    <h6 class="fw-bold">Market Info</h6>
+                    <p class="text-muted small mb-0">
+                        Sidebar reserved for alerts, news, or watchlist.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<!-- ===================== SCRIPT ===================== -->
+<script>
+    let isLoading = false;
+
+    window.onload = loadIntraday;
+
+    async function loadIntraday() {
+        if (isLoading) return;
+
+        isLoading = true;
+        document.getElementById('intraday-loader').classList.remove('d-none');
+
+        try {
+            const res = await fetch('/api/stocks/intraday');
+            const data = await res.json();
+
+            renderIntraday(data);
+
+        } catch (err) {
+            console.error(err);
+        } finally {
+            isLoading = false;
+            document.getElementById('intraday-loader').classList.add('d-none');
+        }
+    }
+
+    function renderIntraday(data) {
+        const container = document.getElementById('intraday-container');
+
+        container.style.opacity = 0.5;
+
+        let html = '';
+
+        data.forEach(stock => {
+            const isUp = stock.percentage >= 0;
+
+            html += `
+                <div class="stock-row">
+                    <div>
+                        <div class="stock-symbol">${stock.symbol}</div>
+                        <div class="stock-price">LKR ${Number(stock.price).toFixed(2)}</div>
+                    </div>
+
+                    <div class="stock-change ${isUp ? 'up' : 'down'}">
+                        ${isUp ? '+' : ''}${stock.percentage.toFixed(2)}%
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+
+        setTimeout(() => {
+            container.style.opacity = 1;
+        }, 150);
+    }
+</script>

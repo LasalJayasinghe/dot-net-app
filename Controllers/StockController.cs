@@ -1,37 +1,32 @@
-using dotnetApp;
-using dotnetApp.Models.Dtos;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using dotnetApp.Infrastructure.Repositories;
 
 namespace dotnetApp.Controllers
 {
-    [Route("api/[controller]")]
+    [Authorize]
     public class StockController : Controller
     {
-        private readonly StockService _stockService;
-
-        public StockController(StockService stockService)
+        private readonly StockRepository _stockRepository;
+        public StockController(StockRepository stockRepository)
         {
-            _stockService = stockService;
+            _stockRepository = stockRepository;
         }
 
-
-        [HttpGet("{symbol}")]
-        public async Task<IActionResult> GetStock(string symbol)
+        public async Task<IActionResult> Index()
         {
-            var data = await _stockService.GetStockDataAsync(symbol);
-            if (data == null)
-                return NotFound(new { message = "Stock not found or API error." });
+            var AspiData = await _stockRepository.GetMarketIndexAsync(MarketIndexType.ASPI);
+            var SnpData = await _stockRepository.GetMarketIndexAsync(MarketIndexType.SNP);
+            var marketStatus = await _stockRepository.GetMarketStatusAsync();
 
-            var result = new
+            var model = new MarketViewModel
             {
-                Symbol = data.ReqSymbolInfo.Symbol,
-                Price = data.ReqSymbolInfo.ClosingPrice,
-                LastTradedPrice = data.ReqSymbolInfo.LastTradedPrice
+                Aspi = AspiData,
+                Snp = SnpData,
+                Status = marketStatus
             };
 
-            return Ok(result);
+            return View(model);
         }
     }
 }

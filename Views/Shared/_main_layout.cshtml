@@ -1,4 +1,9 @@
-﻿<!DOCTYPE html>
+﻿@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+}
+
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -9,25 +14,24 @@
 
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="icon" type="image/png" href="~/assets/logo/icon.png" />
 
-    <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-
-    <!-- Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background: #ffffff;
-            color: #e5e7eb;
+            background: #f9fafb;
+            color: #111827;
             overflow-x: hidden;
         }
 
         /* Sidebar */
         .sidebar {
             width: 260px;
-            background: #ececec;
+            background: #0C0B20;
+            color: #d1d5db;
             position: fixed;
             top: 0;
             left: 0;
@@ -40,30 +44,35 @@
             width: 80px;
         }
 
-        .sidebar.collapsed .logo {
-            display: none;
-        }
-
         .sidebar .logo {
-            color: #000000;
+            display: flex;
+            align-items: center;
+            padding: 1.5rem;
             font-size: 1.2rem;
             font-weight: 700;
-            padding: 1.5rem;
+            color: #ffffff;
+        }
+
+        .sidebar .logo img {
+            height: 40px;
         }
 
         .sidebar a {
-            color: #8c8c8c;
+            color: #d1d5db;
             padding: 0.75rem 1.5rem;
             display: flex;
             align-items: center;
             gap: 1rem;
             text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s, color 0.2s;
         }
 
         .sidebar a:hover,
         .sidebar a.active {
-            background: #f3f4f6;
-            color: #22c55e;
+            background: #111827;
+            color: #95a7f0;
+            border-left: 3px solid #2235c5;
         }
 
         .sidebar.collapsed span {
@@ -74,13 +83,14 @@
             position: absolute;
             right: -15px;
             top: 20px;
-            background: #22c55e;
+            background: #2235c5;
             border: none;
             border-radius: 50%;
             width: 30px;
             height: 30px;
-            color: #000;
+            color: #fff;
             cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         }
 
         /* Main Content */
@@ -96,18 +106,20 @@
 
         /* Top bar */
         .top-bar {
-            background: #020617;
+            background: #ffffff;
             padding: 1rem 2rem;
-            border-bottom: 1px solid #1f2937;
+            border-bottom: 1px solid #e5e7eb;
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .crypto {
             display: flex;
-            gap: 2rem;
+            gap: 1.5rem;
             font-weight: 600;
         }
 
@@ -118,63 +130,103 @@
         .price-down {
             color: #ef4444;
         }
+
+        /* Logout Button */
+        .sidebar form button {
+            background: transparent;
+            border: none;
+            color: #d1d5db;
+            width: 100%;
+            padding: 0.75rem 1.5rem;
+            text-align: left;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .sidebar form button:hover {
+            background: #111827;
+            color: #95a7f0;
+            border-left: 3px solid #95a7f0;
+        }
+
+        /* Full logo visible by default */
+        #logo-full {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Mini logo hidden by default */
+        #logo-mini {
+            display: none;
+        }
+
+        /* When sidebar is collapsed */
+        .sidebar.collapsed #logo-full {
+            display: none;
+            /* hide full logo */
+        }
+
+        .sidebar.collapsed #logo-mini {
+            display: flex;
+            /* show mini logo */
+            justify-content: center;
+            padding: 1.5rem 0;
+        }
     </style>
 </head>
 
 <body>
-
     <!-- SIDEBAR -->
     <nav class="sidebar" id="sidebar">
         <button class="toggle-btn" onclick="toggleSidebar()">
             <i class="fas fa-chevron-left"></i>
         </button>
 
-        <div class="logo">📊 StocksApp</div>
+        <div class="logo" id="logo-full">
+            <img src="~/assets/logo/logo-black.png" alt="AlertMe Logo" />
+        </div>
 
-        <a asp-controller="Home" asp-action="Index" class="active">
+        <div class="logo" id="logo-mini">
+            <img src="~/assets/logo/icon.png" alt="AlertMe Mini Logo" />
+        </div>
+
+        <a asp-controller="Home" asp-action="Index"
+            class="@(currentController == "Home" && currentAction == "Index" ? "active" : "")">
             <i class="fas fa-home"></i><span>Dashboard</span>
         </a>
-        <a asp-controller="Alert" asp-action="List">
+
+        <a asp-controller="Stock" asp-action="Index" class="@(currentController == "Stock" ? "active" : "")">
+            <i class="fas fa-chart-line"></i><span>Stocks</span>
+        </a>
+
+        <a asp-controller="Alert" asp-action="List" class="@(currentController == "Alert" ? "active" : "")">
             <i class="fas fa-bell"></i><span>Alerts</span>
         </a>
 
-         @if (User.Identity?.IsAuthenticated == true)
+
+        @if (User.Identity?.IsAuthenticated == true)
         {
-            <form asp-controller="Auth"
-                asp-action="Logout"
-                method="post"
-                style="display:inline">
+            <form asp-controller="Auth" asp-action="Logout" method="post">
                 @Html.AntiForgeryToken()
-                <button type="submit">Logout</button>
+                <button type="submit"><i class="fas fa-sign-out-alt"></i><span>Logout</span></button>
             </form>
         }
     </nav>
 
     <!-- MAIN -->
     <div class="main-content">
-        
-        <!-- TOP BAR -->
-        <div class="top-bar">
-            <h5 class="mb-0">Market Overview</h5>
-
-            <div class="crypto">
-                <div>BTC: <span id="btcPrice">--</span></div>
-                <div>ETH: <span id="ethPrice">--</span></div>
-                <div>SOL: <span id="solPrice">--</span></div>
-            </div>
-        </div>
-
         <!-- PAGE CONTENT -->
         @RenderBody()
-
     </div>
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
         function toggleSidebar() {
-            document.getElementById("sidebar").classList.toggle("collapsed");
-            document.getElementById("")
+            const sidebar = document.getElementById("sidebar");
+            sidebar.classList.toggle("collapsed");
         }
     </script>
 

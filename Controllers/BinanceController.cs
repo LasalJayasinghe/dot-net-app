@@ -12,11 +12,6 @@ namespace dotnetApp.Controllers
             _binanceService = binanceService;
         }
 
-        [HttpGet]
-        public IActionResult GetPrices()
-        {
-            return Ok(_binanceService.Prices);
-        }
     }
 }
 

@@ -1,9 +1,10 @@
 using dotnetApp;
 using Serilog;
 using Microsoft.EntityFrameworkCore;
-using dotnetApp.Data;
 using Microsoft.AspNetCore.Identity;
-using dotnetApp.Data.Seeders;
+using dotnetApp.Infrastructure.Data;
+using dotnetApp.Infrastructure.Data.Seeders;
+using dotnetApp.Infrastructure.Repositories;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -30,15 +31,33 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Use Serilog instead of default logging
 builder.Host.UseSerilog();
 
+// Memory Cache
+builder.Services.AddMemoryCache();
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddHttpClient<StockService>();
+builder.Services.AddHttpClient<StockService>(client =>
+{
+    client.DefaultRequestHeaders.TryAddWithoutValidation(
+        "Accept", "application/json, text/plain, */*");
+
+    client.DefaultRequestHeaders.TryAddWithoutValidation(
+        "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+
+    client.DefaultRequestHeaders.TryAddWithoutValidation(
+        "Origin", "https://www.cse.lk");
+});
+
+builder.Services.AddScoped<StockRepository>();
+builder.Services.AddScoped<AlertRepository>();
+builder.Services.AddScoped<AppDbContext>();
+builder.Services.AddScoped<AlertService>();
+
 builder.Services.AddHttpClient<TelegramService>();
 
 builder.Services.AddSingleton<BinanceService>();
-
-builder.Services.AddScoped<AlertService>();
-builder.Services.AddScoped<AppDbContext>();
+builder.Services.AddSingleton<IStrategy, EmaRsiStrategy>();
+builder.Services.AddSingleton<TradingBotService>();
 
 builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
 builder.Services.AddHostedService<AlertJob>();
@@ -72,6 +91,12 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 var app = builder.Build();
+
+var binance = app.Services.GetRequiredService<BinanceService>();
+var bot = app.Services.GetRequiredService<TradingBotService>();
+
+binance.CandleClosed += async (c) => await bot.OnCandleClosed(c);
+
 
 if (!app.Environment.IsDevelopment())
 {

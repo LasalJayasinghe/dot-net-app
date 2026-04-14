@@ -11,12 +11,6 @@
                 Search stocks & monitor live crypto prices in real time
             </p>
         </div>
-        <div class="col-md-4 text-end">
-            <img src="https://illustrations.popsy.co/gray/finance-dashboard.svg"
-                 alt="Stock Art"
-                 class="img-fluid"
-                 style="max-height: 140px;">
-        </div>
     </div>
 
     <!-- Main Dashboard -->
@@ -112,7 +106,7 @@
         const symbol = searchInput.value.trim().toUpperCase();
         if (!symbol) return alert("Enter stock symbol");
 
-        const res = await fetch(`/api/stock/${symbol}`);
+        const res = await fetch(`/api/stocks/${symbol}`);
         if (!res.ok) {
             stockResult.innerHTML = `<p class="text-danger">Stock not found</p>`;
             return;

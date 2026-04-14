@@ -1,7 +1,7 @@
-using dotnetApp.ViewModels.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using dotnetApp.Application.ViewModels.Auth;
 
 public class AuthController : Controller
 {
@@ -49,7 +49,7 @@ public class AuthController : Controller
 
         if (!result.Succeeded)
         {
-            ModelState.AddModelError("", "Invalid email or password");
+            ModelState.AddModelError("", "Invalid username or password");
             return View(model);
         }
 
@@ -59,7 +59,8 @@ public class AuthController : Controller
     [HttpGet]
     public IActionResult Login()
     {
-        if(User.Identity.IsAuthenticated){
+        if (User?.Identity?.IsAuthenticated == true)
+        {
             return RedirectToAction("Index", "Home");
         }
         return View(new LoginViewModel());
