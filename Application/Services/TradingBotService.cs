@@ -44,6 +44,7 @@ public class TradingBotService
                 Quantity = quantity
             };
             _walletBalance -= quantity * signal.Price;
+            Console.WriteLine($"Bought {quantity} at {signal.Price}, remaining balance: {_walletBalance:C}");
             _logger.LogInformation($"Wallet after BUY: {_walletBalance:C}");
         }
         else if (signal.Type == "SELL" && _position.IsOpen)
@@ -51,6 +52,7 @@ public class TradingBotService
             _logger.LogInformation($"SELL Signal: {signal.Reason} @ {signal.Price}");
             _walletBalance += _position.Quantity * signal.Price;
             _position = new Position { IsOpen = false };
+            Console.WriteLine($"Sold at {signal.Price}, new balance: {_walletBalance:C}");
             _logger.LogInformation($"Wallet after SELL: {_walletBalance:C}");
         }
 
