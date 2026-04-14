@@ -50,14 +50,16 @@ builder.Services.AddHttpClient<StockService>(client =>
 
 builder.Services.AddScoped<StockRepository>();
 builder.Services.AddScoped<AlertRepository>();
-
 builder.Services.AddScoped<AppDbContext>();
+builder.Services.AddScoped<AlertService>();
 
 builder.Services.AddHttpClient<TelegramService>();
-builder.Services.AddSingleton<BinanceService>();
-builder.Services.AddScoped<AlertService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
 
+builder.Services.AddSingleton<BinanceService>();
+builder.Services.AddSingleton<IStrategy, EmaRsiStrategy>();
+builder.Services.AddSingleton<TradingBotService>();
+
+builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
 builder.Services.AddHostedService<AlertJob>();
 
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
@@ -89,6 +91,12 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 var app = builder.Build();
+
+var binance = app.Services.GetRequiredService<BinanceService>();
+var bot = app.Services.GetRequiredService<TradingBotService>();
+
+binance.CandleClosed += async (c) => await bot.OnCandleClosed(c);
+
 
 if (!app.Environment.IsDevelopment())
 {

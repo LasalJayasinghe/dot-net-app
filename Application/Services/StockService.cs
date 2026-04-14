@@ -61,8 +61,9 @@ public class StockService
                 existingStock.Change = data.ReqSymbolInfo.Change;
 
                 await _stockRepository.SaveChangesAsync();
+                return data;
             }
-            return data;
+            return null;
         }
         catch (HttpRequestException ex)
         {
@@ -136,7 +137,7 @@ public class StockService
                 await _stockRepository.SaveChangesAsync();
             }
 
-            _logger.LogInformation("Trading Summary Data updated at {Time}", DateTime.Now);
+            // _logger.LogInformation("Trading Summary Data updated at {Time}", DateTime.Now);
         }
         catch (HttpRequestException ex)
         {
@@ -290,6 +291,11 @@ public class StockService
             };
 
             var snpData = JsonSerializer.Deserialize<StockIndicesDto>(content, options);
+            if (snpData == null)
+            {
+                return new StockIndicesDto();
+            }
+
             var marketIndex = new MarketIndices
             {
                 IndexType = MarketIndexType.SNP,

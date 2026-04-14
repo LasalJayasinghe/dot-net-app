@@ -72,15 +72,7 @@ public class StockRepository
 
         if (entity == null)
         {
-            if(data.IndexType == MarketIndexType.ASPI)
-            {
-                entity = new MarketIndices();
-            }
-            else if(data.IndexType == MarketIndexType.SNP)
-            {
-                entity = new MarketIndices();
-            }
-            _db.Add(entity);
+            throw new InvalidOperationException("MarketIndices entity could not be created.");
         }
 
         entity.IndexType = data.IndexType;

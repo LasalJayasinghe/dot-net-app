@@ -16,9 +16,10 @@ public class AlertRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task UpdateAlertAsync(Alert alert)
+    public Task UpdateAlertAsync(Alert alert)
     {
         _db.Alerts.Update(alert);
+        return Task.CompletedTask;
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
