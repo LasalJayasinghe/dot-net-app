@@ -9,6 +9,8 @@ public class EmaRsiStrategy : IStrategy
         if (candles.Count < 30)
             return null;
 
+            Console.WriteLine($"Evaluating strategy with {candles.Count} candles...");
+
         var closes = candles.Select(x => x.Close).ToList();
 
         var emaS = _emaShort.Calculate(closes);
@@ -16,6 +18,8 @@ public class EmaRsiStrategy : IStrategy
         var rsi = _rsi.Calculate(closes);
 
         var lastPrice = closes.Last();
+
+        Console.WriteLine($"EMA9: {emaS:F2}, EMA21: {emaL:F2}, RSI: {rsi:F2}, LastPrice: {lastPrice:F2}");
 
         // 🟢 BUY LOGIC
         if (!position.IsOpen &&

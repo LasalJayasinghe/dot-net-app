@@ -72,7 +72,8 @@ public class StockRepository
 
         if (entity == null)
         {
-            throw new InvalidOperationException("MarketIndices entity could not be created.");
+            entity = new MarketIndices { IndexType = data.IndexType };
+            await _db.MarketIndices.AddAsync(entity);
         }
 
         entity.IndexType = data.IndexType;
