@@ -1,0 +1,31 @@
+name: Deploy .NET App to AWS EC2
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USER }}
+          key: ${{ secrets.AWS_KEY }}
+          script: |
+            cd /home/ubuntu/dot-net-app
+            git pull origin main
+
+            echo "Building project..."
+            dotnet build
+
+            echo "Restarting service..."
+            sudo systemctl restart dotnet-app || true
