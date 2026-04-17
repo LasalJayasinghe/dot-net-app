@@ -134,7 +134,7 @@ public class BinanceService : BackgroundService
             if (string.IsNullOrEmpty(symbol))
                 return;
 
-            // ✅ dedupe key BEFORE building object
+            // // ✅ dedupe key BEFORE building object
             var key = $"{symbol}:{openTime:O}";
 
             if (!_candleCache.TryAdd(key, DateTime.UtcNow))

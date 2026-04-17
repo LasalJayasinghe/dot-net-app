@@ -23,8 +23,8 @@ namespace dotnetApp.Migrations
                     IsTradingDay = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: false),
                     OpenTime = table.Column<TimeSpan>(type: "time", nullable: true),
                     CloseTime = table.Column<TimeSpan>(type: "time", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime", nullable: false, defaultValueSql: "UTC_TIMESTAMP()"),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime", nullable: false, defaultValueSql: "UTC_TIMESTAMP()")
+                    CreatedAt = table.Column<DateTime>(type: "datetime", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
                 },
                 constraints: table =>
                 {
@@ -46,8 +46,8 @@ namespace dotnetApp.Migrations
                     LowValue = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     Change = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     Percentage = table.Column<decimal>(type: "decimal(5,2)", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime", nullable: false, defaultValueSql: "UTC_TIMESTAMP()"),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime", nullable: false, defaultValueSql: "UTC_TIMESTAMP()")
+                    CreatedAt = table.Column<DateTime>(type: "datetime", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
                 },
                 constraints: table =>
                 {

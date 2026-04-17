@@ -39,7 +39,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<MarketStatus>(entity =>
         {
-            entity.ToTable("cse_marketstatus");
+            entity.ToTable("cse_MarketStatus");
 
             entity.HasKey(e => e.Id);
 
@@ -49,7 +49,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<MarketIndices>(entity =>
         {
-            entity.ToTable("cse_marketindices");
+            entity.ToTable("cse_MarketIndices");
         });
 
         builder.Entity<MarketIndices>()
