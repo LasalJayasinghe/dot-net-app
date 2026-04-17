@@ -32,7 +32,7 @@ jobs:
           username: ${{ secrets.AWS_USER }}
           key: ${{ secrets.AWS_KEY }}
           source: "publish/*"
-          target: "/home/ubuntu/dot-net-app/publish"
+          target: "/home/ubuntu/dot-net-app"
 
       - name: Restart service via SSH
         uses: appleboy/ssh-action@v1.0.3
