@@ -88,6 +88,9 @@ public class TradingBotService
 
             _walletBalance -= quantity * entry;
 
+            _logger.LogInformation($"BUY Signal: {signal.Reason} @ {entry}");
+            _logger.LogInformation($"Wallet after BUY: {_walletBalance:C}");
+
             Console.WriteLine($"BUY @ {entry}");
             Console.WriteLine($"SL: {stopLoss} | TP: {takeProfit}");
         }
