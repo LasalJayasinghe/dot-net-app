@@ -43,21 +43,28 @@ public class StockRepository
     public async Task AddAsync(MarketStatus data)
     {
         var entity = await this.GetMarketStatusAsync();
-        bool IsTradingDay = DateTime.UtcNow.DayOfWeek != DayOfWeek.Saturday && DateTime.UtcNow.DayOfWeek != DayOfWeek.Sunday;
+
+        bool isTradingDay =
+            DateTime.UtcNow.DayOfWeek != DayOfWeek.Saturday &&
+            DateTime.UtcNow.DayOfWeek != DayOfWeek.Sunday;
 
         if (entity == null)
         {
-            entity = new MarketStatus { Id = 1 };
+            entity = new MarketStatus
+            {
+                Id = 1
+            };
+
             _db.MarketStatus.Add(entity);
         }
 
-        entity.IsTradingDay = IsTradingDay;
+        entity.IsTradingDay = isTradingDay;
         entity.IsOpen = data.IsOpen;
         entity.UpdatedAt = DateTime.UtcNow;
 
-        _db.MarketStatus.Update(entity);
+        await _db.SaveChangesAsync();
     }
-
+    
     #endregion
 
     #region MarketIndices
@@ -68,7 +75,7 @@ public class StockRepository
     public async Task AddAsync(MarketIndices data)
     {
 
-        var entity = await this.GetMarketIndexAsync(data.IndexType);    
+        var entity = await this.GetMarketIndexAsync(data.IndexType);
 
         if (entity == null)
         {
