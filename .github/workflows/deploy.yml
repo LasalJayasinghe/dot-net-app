@@ -14,7 +14,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Restore dependencies
         run: dotnet restore
@@ -32,7 +32,7 @@ jobs:
           username: ${{ secrets.AWS_USER }}
           key: ${{ secrets.AWS_KEY }}
           source: "publish/*"
-          target: "/home/ubuntu/dotnet-app/publish"
+          target: "/home/ubuntu/dot-net-app/publish"
 
       - name: Restart service via SSH
         uses: appleboy/ssh-action@v1.0.3
