@@ -24,7 +24,7 @@ public class BinanceService : BackgroundService
     //     "btcusdt@ticker/ethusdt@ticker/solusdt@ticker";
 
     private readonly string _url =
-        "wss://stream.binance.com:9443/ws/btcusdt@kline_1m";
+        "wss://stream.binance.com:9443/ws/btcusdt@kline_5m";
 
     public BinanceService(ILogger<BinanceService> logger)
     {
