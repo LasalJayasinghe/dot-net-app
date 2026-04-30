@@ -22,7 +22,6 @@ public class AuthController : Controller
         {
             UserName = dto.Email,
             Email = dto.Email,
-            FullName = dto.FullName
         };
 
         var result = await _userManager.CreateAsync(user, dto.Password);

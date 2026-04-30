@@ -11,6 +11,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Stocks> Stocks { get; set; } = null!;
     public DbSet<MarketStatus> MarketStatus { get; set; } = null!;
     public DbSet<MarketIndices> MarketIndices { get; set; } = null!;
+    public DbSet<Profile> Profiles { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -55,5 +56,18 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<MarketIndices>()
             .Property(e => e.IndexType)
             .HasConversion<string>();
+
+        builder.Entity<ApplicationUser>()
+            .HasOne(u => u.Profile)
+            .WithOne(p => p.User)
+            .HasForeignKey<Profile>(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<Profile>(entity =>
+        {
+            entity.ToTable("profile");
+            entity.HasIndex(p => p.UserId);
+        });
     }
+
 }

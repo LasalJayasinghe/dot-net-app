@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Identity;
 using dotnetApp.Infrastructure.Data;
 using dotnetApp.Infrastructure.Data.Seeders;
 using dotnetApp.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -50,8 +53,10 @@ builder.Services.AddHttpClient<StockService>(client =>
 
 builder.Services.AddScoped<StockRepository>();
 builder.Services.AddScoped<AlertRepository>();
+builder.Services.AddScoped<ProfileRepository>();
 builder.Services.AddScoped<AppDbContext>();
 builder.Services.AddScoped<AlertService>();
+builder.Services.AddScoped<TokenService>();
 
 builder.Services.AddHttpClient<TelegramService>();
 
@@ -88,6 +93,43 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Auth/Login";
     options.AccessDeniedPath = "/Home/AccessDenied";
+});
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])
+        ),
+
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+
+    // options.AddPolicy("AllowFrontend", policy =>
+    // {
+    //     policy.WithOrigins("http://localhost:3000")
+    //           .AllowAnyHeader()
+    //           .AllowAnyMethod();
+    // });
 });
 
 var app = builder.Build();
@@ -129,6 +171,7 @@ using (var scope = app.Services.CreateScope())
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapStaticAssets();

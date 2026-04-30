@@ -9,6 +9,7 @@ namespace dotnetApp.Infrastructure.Data.Seeders
         {
             var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var dbContext = serviceProvider.GetRequiredService<AppDbContext>();
 
             // 1️⃣ Define roles
             string[] roles = { "Admin", "User" };
@@ -72,6 +73,16 @@ namespace dotnetApp.Infrastructure.Data.Seeders
                 };
                 await userManager.CreateAsync(adminUser, "Admin@123"); // Set default password
                 await userManager.AddToRoleAsync(adminUser, "Admin");
+
+                dbContext.Profiles.Add(new Profile
+                {
+                    UserId = adminUser.Id,
+                    FirstName = "Admin",
+                    LastName = "User",
+                    Bio = "Default admin account"
+                });
+                
+                await dbContext.SaveChangesAsync();
             }
         }
     }
