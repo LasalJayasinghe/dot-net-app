@@ -69,10 +69,10 @@ builder.Services.AddHostedService<AlertJob>();
 
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
 
-builder.Services
-    .AddIdentity<ApplicationUser, IdentityRole>()
-    .AddEntityFrameworkStores<AppDbContext>()
-    .AddDefaultTokenProviders();
+// builder.Services
+//     .AddIdentity<ApplicationUser, IdentityRole>()
+//     .AddEntityFrameworkStores<AppDbContext>()
+//     .AddDefaultTokenProviders();
 
 builder.Services.AddAuthorization(options =>
 {
@@ -89,13 +89,19 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim("permission", "alert.view"));
 });
 
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.LoginPath = "/Auth/Login";
-    options.AccessDeniedPath = "/Home/AccessDenied";
-});
+// Cookie related authentication
+// builder.Services.ConfigureApplicationCookie(options =>
+// {
+//     options.LoginPath = "/Auth/Login";
+//     options.AccessDeniedPath = "/Home/AccessDenied";
+// });
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
 .AddJwtBearer(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
@@ -112,6 +118,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         ),
 
         ClockSkew = TimeSpan.Zero
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnChallenge = context =>
+        {
+            context.HandleResponse();
+            context.Response.StatusCode = 401;
+            context.Response.ContentType = "application/json";
+            return Task.CompletedTask;
+        }
     };
 });
 

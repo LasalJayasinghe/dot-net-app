@@ -15,6 +15,7 @@ public class ProfileApiController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetProfile(CancellationToken cancellationToken)
     {
+        Console.WriteLine("GetProfile called");
         var userId = User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
         if (userId == null) return Unauthorized();
 
