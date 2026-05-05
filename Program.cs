@@ -54,7 +54,7 @@ builder.Services.AddHttpClient<StockService>(client =>
 builder.Services.AddScoped<StockRepository>();
 builder.Services.AddScoped<AlertRepository>();
 builder.Services.AddScoped<ProfileRepository>();
-builder.Services.AddScoped<AppDbContext>();
+// builder.Services.AddScoped<AppDbContext>();
 builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<TokenService>();
 
@@ -69,10 +69,10 @@ builder.Services.AddHostedService<AlertJob>();
 
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
 
-// builder.Services
-//     .AddIdentity<ApplicationUser, IdentityRole>()
-//     .AddEntityFrameworkStores<AppDbContext>()
-//     .AddDefaultTokenProviders();
+builder.Services
+    .AddIdentity<ApplicationUser, IdentityRole>()
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders();
 
 builder.Services.AddAuthorization(options =>
 {
