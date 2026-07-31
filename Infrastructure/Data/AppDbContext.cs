@@ -12,6 +12,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<MarketStatus> MarketStatus { get; set; } = null!;
     public DbSet<MarketIndices> MarketIndices { get; set; } = null!;
     public DbSet<Profile> Profiles { get; set; } = null!;
+    public DbSet<WatchlistItem> WatchlistItems { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -67,6 +68,32 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.ToTable("profile");
             entity.HasIndex(p => p.UserId);
+        });
+
+        builder.Entity<WatchlistItem>(entity =>
+        {
+            entity.ToTable("WatchlistItems");
+
+            entity.HasKey(w => w.Id);
+
+            entity.Property(w => w.UserId)
+                .IsRequired()
+                .HasMaxLength(255);
+
+            entity.Property(w => w.Symbol)
+                .IsRequired()
+                .HasMaxLength(20);
+
+            entity.Property(w => w.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+            entity.HasIndex(w => new { w.UserId, w.Symbol })
+                .IsUnique();
+
+            entity.HasOne(w => w.User)
+                .WithMany(u => u.WatchlistItems)
+                .HasForeignKey(w => w.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

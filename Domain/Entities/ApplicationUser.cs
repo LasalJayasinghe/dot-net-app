@@ -6,4 +6,5 @@ public class ApplicationUser : IdentityUser
     public string? RefreshToken { get; set; }
     public DateTime? RefreshTokenExpiry { get; set; }
     public Profile Profile { get; set; } = null!;
+    public ICollection<WatchlistItem> WatchlistItems { get; set; } = new List<WatchlistItem>();
 }

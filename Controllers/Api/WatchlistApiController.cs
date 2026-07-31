@@ -1,0 +1,99 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using dotnetApp.Infrastructure.Data;
+
+namespace dotnetApp.Controllers.Api;
+
+[ApiController]
+[Route("api/watchlist")]
+[Authorize]
+public class WatchlistApiController : ControllerBase
+{
+    private readonly StockService _stockService;
+    private readonly AppDbContext _dbContext;
+
+    public WatchlistApiController(StockService stockService, AppDbContext dbContext)
+    {
+        _stockService = stockService;
+        _dbContext = dbContext;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Get()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized(new { message = "Invalid token - user id missing" });
+
+        var symbols = await _dbContext.WatchlistItems
+            .Where(w => w.UserId == userId)
+            .Select(w => w.Symbol)
+            .ToListAsync();
+
+        if (symbols.Count == 0)
+            return Ok(Array.Empty<object>());
+
+        var tasks = symbols.Select(async symbol =>
+        {
+            var data = await _stockService.GetStockDataAsync(ToLookupSymbol(symbol));
+            if (data == null) return null;
+
+            return new
+            {
+                symbol = data.ReqSymbolInfo.Symbol,
+                price = data.ReqSymbolInfo.LastTradedPrice,
+                changePct = data.ReqSymbolInfo.PercentageChange,
+            };
+        });
+
+        var results = await Task.WhenAll(tasks);
+        return Ok(results.Where(r => r != null));
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Add([FromBody] AddWatchlistDto dto)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized(new { message = "Invalid token - user id missing" });
+
+        var symbol = (dto.Symbol ?? string.Empty).Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(symbol))
+            return BadRequest(new { message = "Symbol is required" });
+
+        var data = await _stockService.GetStockDataAsync(ToLookupSymbol(symbol));
+        if (data == null)
+            return BadRequest(new { message = "Stock not found" });
+
+        var exists = await _dbContext.WatchlistItems
+            .AnyAsync(w => w.UserId == userId && w.Symbol == symbol);
+        if (exists)
+            return Conflict(new { message = "Symbol already in watchlist" });
+
+        _dbContext.WatchlistItems.Add(new WatchlistItem
+        {
+            UserId = userId,
+            Symbol = symbol,
+        });
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(new
+        {
+            symbol = data.ReqSymbolInfo.Symbol,
+            price = data.ReqSymbolInfo.LastTradedPrice,
+            changePct = data.ReqSymbolInfo.PercentageChange,
+        });
+    }
+
+    private static string ToLookupSymbol(string input)
+    {
+        return input.Contains('.') ? input : $"{input}.N0000";
+    }
+
+    public class AddWatchlistDto
+    {
+        public string? Symbol { get; set; }
+    }
+}

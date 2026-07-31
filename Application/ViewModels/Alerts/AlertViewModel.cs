@@ -15,6 +15,9 @@ public class AlertCreateViewModel
     [Display(Name = "Is Above?")]
     public bool IsAbove { get; set; }
 
+    [Display(Name = "Is Active?")]
+    public bool IsActive { get; set; } = true;
+
     public List<Stocks> StockNames { get; set; } = new();
 
 }
@@ -29,6 +32,9 @@ public class AlertEditViewModel
 
     [Display(Name = "Is Above?")]
     public bool IsAbove { get; set; }
+
+    [Display(Name = "Is Active?")]
+    public bool IsActive { get; set; } = true;
 
     public List<Stocks> StockNames { get; set; } = new();
 

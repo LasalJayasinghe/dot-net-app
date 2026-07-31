@@ -320,4 +320,9 @@ public class StockService
     {
         return await _stockRepository.GetIntraDayValues();
     }
+
+    public async Task<MarketStatus?> GetSavedMarketStatusAsync()
+    {
+        return await _stockRepository.GetMarketStatusAsync();
+    }
 }

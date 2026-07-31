@@ -23,6 +23,34 @@ public class AlertApiController : ControllerBase
         _dbContext = dbContext;
     }
 
+    private static object ToDto(Alert alert)
+    {
+        return new
+        {
+            id = alert.Id,
+            symbol = alert.Symbol,
+            targetPrice = alert.TargetPrice,
+            isAbove = alert.IsAbove,
+            isActive = alert.IsActive,
+            createdAt = alert.CreatedAt
+        };
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        var alerts = await _dbContext.Alerts
+            .AsNoTracking()
+            .Where(a => a.CreatedBy == user.Id)
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+
+        return Ok(alerts.Select(ToDto));
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create(AlertCreateViewModel vm)
     {
@@ -35,7 +63,7 @@ public class AlertApiController : ControllerBase
             Symbol = vm.Symbol,
             TargetPrice = vm.TargetPrice,
             IsAbove = vm.IsAbove,
-            IsActive = true,
+            IsActive = vm.IsActive,
             CreatedBy = user.Id,
             CreatedAt = DateTime.UtcNow
         };
@@ -46,7 +74,7 @@ public class AlertApiController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = alert.Id },
-            new { alert.Id }
+            ToDto(alert)
         );
     }
 
@@ -65,10 +93,11 @@ public class AlertApiController : ControllerBase
 
         alert.TargetPrice = vm.TargetPrice;
         alert.IsAbove = vm.IsAbove;
+        alert.IsActive = vm.IsActive;
 
         await _dbContext.SaveChangesAsync();
 
-        return NoContent();
+        return Ok(ToDto(alert));
     }
 
     [HttpDelete("{id:int}")]
@@ -103,6 +132,6 @@ public class AlertApiController : ControllerBase
         if (alert == null)
             return NotFound();
 
-        return Ok(alert);
+        return Ok(ToDto(alert));
     }
 }
