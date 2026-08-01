@@ -98,8 +98,8 @@ public class StockApiController : ControllerBase
     [HttpGet("movers")]
     public async Task<IActionResult> GetMovers()
     {
-        var gainers = await _stockService.GetTopGainers();
-        var losers = await _stockService.GetTopLooses();
+        var gainers = await _stockService.GetTopGainers() ?? new List<StockTopDto>();
+        var losers = await _stockService.GetTopLooses() ?? new List<StockTopDto>();
         return Ok(new { gainers, losers });
     }
 

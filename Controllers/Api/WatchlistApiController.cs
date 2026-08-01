@@ -35,21 +35,21 @@ public class WatchlistApiController : ControllerBase
         if (symbols.Count == 0)
             return Ok(Array.Empty<object>());
 
-        var tasks = symbols.Select(async symbol =>
+        var results = new List<object>();
+        foreach (var symbol in symbols)
         {
             var data = await _stockService.GetStockDataAsync(ToLookupSymbol(symbol));
-            if (data == null) return null;
+            if (data == null) continue;
 
-            return new
+            results.Add(new
             {
                 symbol = data.ReqSymbolInfo.Symbol,
                 price = data.ReqSymbolInfo.LastTradedPrice,
                 changePct = data.ReqSymbolInfo.PercentageChange,
-            };
-        });
+            });
+        }
 
-        var results = await Task.WhenAll(tasks);
-        return Ok(results.Where(r => r != null));
+        return Ok(results);
     }
 
     [HttpPost]

@@ -218,7 +218,7 @@ public class StockService
         catch (HttpRequestException ex)
         {
             Console.WriteLine($"Request error: {ex.Message}");
-            return null;
+            return new List<StockTopDto>();
         }
     }
 
@@ -241,7 +241,7 @@ public class StockService
         catch (HttpRequestException ex)
         {
             Console.WriteLine($"Request error: {ex.Message}");
-            return null;
+            return new List<StockTopDto>();
         }
     }
 
