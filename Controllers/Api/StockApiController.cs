@@ -16,7 +16,7 @@ public class StockApiController : ControllerBase
         _stockService = stockService;
     }
 
-    [HttpGet("{symbol}")]
+    [HttpGet("details/{symbol}")]
     public async Task<IActionResult> GetStock(string symbol)
     {
         var lookup = symbol.Contains('.') ? symbol : $"{symbol}.N0000";
@@ -75,5 +75,39 @@ public class StockApiController : ControllerBase
             closeTime = status.CloseTime,
             updatedAt = status.UpdatedAt
         });
+    }
+
+    [HttpGet("summary")]
+    public async Task<IActionResult> GetSummary()
+    {
+        var stocks = await _stockService.GetStockTickersAsync();
+        var result = stocks.Select(s => new
+        {
+            symbol = s.Symbol,
+            name = s.Name,
+            price = s.Price,
+            previousClose = s.PreviousClose,
+            high = s.High,
+            low = s.Low,
+            percentageChange = s.PercentageChange,
+            change = s.Change
+        });
+        return Ok(result);
+    }
+
+    [HttpGet("movers")]
+    public async Task<IActionResult> GetMovers()
+    {
+        var gainers = await _stockService.GetTopGainers();
+        var losers = await _stockService.GetTopLooses();
+        return Ok(new { gainers, losers });
+    }
+
+    [HttpGet("indices")]
+    public async Task<IActionResult> GetIndices()
+    {
+        var aspi = await _stockService.GetASPIData();
+        var snp = await _stockService.GetSnpData();
+        return Ok(new { aspi, snp });
     }
 }

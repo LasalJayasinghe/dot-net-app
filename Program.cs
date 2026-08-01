@@ -38,7 +38,10 @@ builder.Host.UseSerilog();
 builder.Services.AddMemoryCache();
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllers();
+
+// SignalR — required for real-time Crypto Dashboard push
+builder.Services.AddSignalR();
 builder.Services.AddHttpClient<StockService>(client =>
 {
     client.DefaultRequestHeaders.TryAddWithoutValidation(
@@ -63,6 +66,18 @@ builder.Services.AddHttpClient<TelegramService>();
 builder.Services.AddSingleton<BinanceService>();
 builder.Services.AddSingleton<IStrategy, EmaRsiStrategy>();
 builder.Services.AddSingleton<TradingBotService>();
+
+// Crypto Dashboard services
+builder.Services.AddScoped<ICryptoMarketService, CryptoMarketService>();
+builder.Services.AddScoped<IAiMarketSummaryService, AiMarketSummaryService>();
+
+// Named HttpClient for Binance REST API — no API keys needed for public endpoints
+builder.Services.AddHttpClient("binance", client =>
+{
+    client.BaseAddress = new Uri("https://api.binance.com");
+    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
 builder.Services.AddHostedService<AlertJob>();
@@ -136,17 +151,11 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.SetIsOriginAllowed(origin => true) // allows any origin
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials(); // required for SignalR cross-origin
     });
-
-    // options.AddPolicy("AllowFrontend", policy =>
-    // {
-    //     policy.WithOrigins("http://localhost:3000")
-    //           .AllowAnyHeader()
-    //           .AllowAnyMethod();
-    // });
 });
 
 var app = builder.Build();
@@ -159,7 +168,7 @@ binance.CandleClosed += async (c) => await bot.OnCandleClosed(c);
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler("/error");
     app.UseHsts();
 }
 
@@ -191,11 +200,11 @@ app.UseRouting();
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapStaticAssets();
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
+app.MapControllers();
+app.Map("/error", () => Results.Problem());
+
+// SignalR hub endpoint for the Crypto Trading Dashboard
+app.MapHub<CryptoHub>("/hubs/crypto");
 
 
 app.Run();

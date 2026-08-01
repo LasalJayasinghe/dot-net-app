@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using dotnetApp.Application.Dtos;
 using dotnetApp.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -161,6 +161,11 @@ public class StockService
         });
 
         return result ?? new List<Stocks>();
+    }
+
+    public async Task<List<Stocks>> GetStockTickersAsync()
+    {
+        return await _stockRepository.GetStockTickersAsync();
     }
 
     public async Task<MarketStatusDto?> GetMarketStatus()

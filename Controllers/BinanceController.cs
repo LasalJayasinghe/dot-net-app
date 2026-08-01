@@ -2,8 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace dotnetApp.Controllers
 {
+    [ApiController]
     [Route("api/[controller]")]
-    public class BinanceController : Controller
+    public class BinanceController : ControllerBase
     {
         private readonly BinanceService _binanceService;
 

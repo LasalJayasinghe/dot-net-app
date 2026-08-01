@@ -4,8 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace dotnetApp.Controllers;
 
+[ApiController]
 [Route("api/[controller]")]
-public class TelegramController : Controller
+public class TelegramController : ControllerBase
 {
     private readonly TelegramService _telegramService;
     private readonly StockService _stockService;

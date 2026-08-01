@@ -103,6 +103,15 @@ public class StockRepository
 
     #endregion
 
+    public async Task<List<Stocks>> GetStockTickersAsync()
+    {
+        return await _db.Stocks
+            .AsNoTracking()
+            .OrderByDescending(s => s.PercentageChange) // Top gainers first
+            .Take(50)
+            .ToListAsync();
+    }
+
     public async Task<List<StockIntraDay>?> GetIntraDayValues()
     {
         return await _db.Stocks
@@ -111,11 +120,10 @@ public class StockRepository
             {
                 symbol = s.Symbol,
                 price = s.ClosingPrice,
-                percentage = ((s.High - s.Low) / s.Low) * 100
+                percentage = ((s.High - s.Low) / (s.Low == 0 ? 1 : s.Low)) * 100
             })
             .OrderByDescending(s => s.percentage)
             .Take(50)
             .ToListAsync();
-
     }
 }
