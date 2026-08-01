@@ -37,10 +37,16 @@ public class AlertService
             {
                 try
                 {
+                    var userProfile = await _dbContext.Profiles
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(p => p.UserId == alert.CreatedBy, stoppingToken);
+
+                    long.TryParse(userProfile?.TelegramId, out long userChatId);
+
                     await _telegramService.SendMessageAsync(
-                        122233, 
-                     $"Alert: {alert.Symbol} has reached the target price of {alert.TargetPrice:N2}. Current price: {existingStock.Price:N2}"
-                 );
+                        userChatId, 
+                        $"Alert: {alert.Symbol} has reached the target price of {alert.TargetPrice:N2}. Current price: {existingStock.Price:N2}"
+                    );
 
                     alert.IsActive = false;
                     _dbContext.Alerts.Update(alert);

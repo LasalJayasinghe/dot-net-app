@@ -27,9 +27,10 @@ public class TelegramService
         Console.WriteLine("Sending Telegram message: " + message);
         var url = $"https://api.telegram.org/bot{_settings.BotToken}/sendMessage";
 
+        var targetChatId = chatId != 0 ? chatId.ToString() : _settings.ChatId;
         var payload = new
         {
-            chat_id = _settings.ChatId,
+            chat_id = targetChatId,
             text = message
         };
 

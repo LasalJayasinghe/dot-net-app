@@ -104,11 +104,11 @@ public class CryptoApiController : ControllerBase
                 return new
                 {
                     time   = arr[0].GetInt64() / 1000,          // seconds for Lightweight Charts
-                    open   = decimal.Parse(arr[1].GetString()!),
-                    high   = decimal.Parse(arr[2].GetString()!),
-                    low    = decimal.Parse(arr[3].GetString()!),
-                    close  = decimal.Parse(arr[4].GetString()!),
-                    volume = decimal.Parse(arr[5].GetString()!)
+                    open   = decimal.Parse(arr[1].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    high   = decimal.Parse(arr[2].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    low    = decimal.Parse(arr[3].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    close  = decimal.Parse(arr[4].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    volume = decimal.Parse(arr[5].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
                 };
             }).ToList();
 
@@ -225,9 +225,9 @@ public class CryptoApiController : ControllerBase
                 .Select(t => new
                 {
                     id           = t.GetProperty("id").GetInt64(),
-                    price        = decimal.Parse(t.GetProperty("price").GetString()!),
-                    qty          = decimal.Parse(t.GetProperty("qty").GetString()!),
-                    quoteQty     = decimal.Parse(t.GetProperty("quoteQty").GetString()!),
+                    price        = decimal.Parse(t.GetProperty("price").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    qty          = decimal.Parse(t.GetProperty("qty").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    quoteQty     = decimal.Parse(t.GetProperty("quoteQty").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
                     time         = DateTimeOffset.FromUnixTimeMilliseconds(t.GetProperty("time").GetInt64()).UtcDateTime,
                     // isBuyerMaker=false → aggressive BUY; true → aggressive SELL
                     side         = t.GetProperty("isBuyerMaker").GetBoolean() ? "SELL" : "BUY"
@@ -317,11 +317,11 @@ public class CryptoApiController : ControllerBase
                 Symbol    = symbol,
                 OpenTime  = DateTimeOffset.FromUnixTimeMilliseconds(arr[0].GetInt64()).UtcDateTime,
                 CloseTime = DateTimeOffset.FromUnixTimeMilliseconds(arr[6].GetInt64()).UtcDateTime,
-                Open      = decimal.Parse(arr[1].GetString()!),
-                High      = decimal.Parse(arr[2].GetString()!),
-                Low       = decimal.Parse(arr[3].GetString()!),
-                Close     = decimal.Parse(arr[4].GetString()!),
-                Volume    = decimal.Parse(arr[5].GetString()!)
+                Open      = decimal.Parse(arr[1].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                High      = decimal.Parse(arr[2].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                Low       = decimal.Parse(arr[3].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                Close     = decimal.Parse(arr[4].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                Volume    = decimal.Parse(arr[5].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
             };
         }).ToList();
 

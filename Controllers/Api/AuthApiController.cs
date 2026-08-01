@@ -107,8 +107,8 @@ public class AuthController : ControllerBase
         return Ok();
     }
 
-    [HttpPost]
-    [Route("change-password")]
+    [Authorize]
+    [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto changePasswordDto, CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -122,12 +122,13 @@ public class AuthController : ControllerBase
             return NotFound(new { message = "User not found" });
 
         var result = await _userManager.ChangePasswordAsync(user, changePasswordDto.CurrentPassword, changePasswordDto.NewPassword);
-        user.RefreshToken = null;
-        user.RefreshTokenExpiry = null;
-        await _userManager.UpdateAsync(user);
 
         if (!result.Succeeded)
             return BadRequest(new { message = "Current password is incorrect" });
+
+        user.RefreshToken = null;
+        user.RefreshTokenExpiry = null;
+        await _userManager.UpdateAsync(user);
 
         return Ok(new { message = "Password changed successfully" });
     }

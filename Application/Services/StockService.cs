@@ -93,8 +93,8 @@ public class StockService
             var symbols = stockItems.ReqTradeSummery.Select(s => s.Symbol).ToList();
 
             // Fetch existing stocks in one query
-            var existingStocks = await _stockRepository.GetBySymbolsAsync(symbols)
-                .ContinueWith(t => t.Result.ToDictionary(s => s.Symbol, s => s));
+            var existingStocksList = await _stockRepository.GetBySymbolsAsync(symbols);
+            var existingStocks = existingStocksList.ToDictionary(s => s.Symbol, s => s);
 
             int batchSize = 50;
             for (int i = 0; i < stockItems.ReqTradeSummery.Count; i += batchSize)
@@ -317,7 +317,7 @@ public class StockService
         catch (HttpRequestException ex)
         {
             Console.WriteLine($"Request error: {ex.Message}");
-            return null;
+            return new StockIndicesDto();
         }
     }
 

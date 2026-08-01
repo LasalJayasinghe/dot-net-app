@@ -82,18 +82,29 @@ public class BinanceService : BackgroundService
                 await ws.ConnectAsync(new Uri(KlineUrl), stoppingToken);
                 _logger.LogInformation("Binance kline WebSocket connected.");
 
+                var ms = new System.IO.MemoryStream();
                 var buffer = new byte[8192];
                 while (ws.State == WebSocketState.Open && !stoppingToken.IsCancellationRequested)
                 {
                     try
                     {
-                        var result = await ws.ReceiveAsync(buffer, stoppingToken);
+                        ms.SetLength(0);
+                        WebSocketReceiveResult result;
+                        do
+                        {
+                            result = await ws.ReceiveAsync(buffer, stoppingToken);
+                            if (result.MessageType == WebSocketMessageType.Close) break;
+                            ms.Write(buffer, 0, result.Count);
+                        }
+                        while (!result.EndOfMessage);
+
                         if (result.MessageType == WebSocketMessageType.Close)
                         {
                             _logger.LogWarning("Kline WebSocket closed by server. Reconnecting…");
                             break;
                         }
-                        var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
+
+                        var msg = Encoding.UTF8.GetString(ms.ToArray());
                         await ProcessCryptoCandles(msg);
                     }
                     catch (Exception ex)
@@ -259,11 +270,11 @@ public class BinanceService : BackgroundService
                 Symbol    = k.GetProperty("s").GetString()!,
                 OpenTime  = openTime,
                 CloseTime = DateTimeOffset.FromUnixTimeMilliseconds(k.GetProperty("T").GetInt64()).UtcDateTime,
-                Open      = decimal.Parse(k.GetProperty("o").GetString()!),
-                High      = decimal.Parse(k.GetProperty("h").GetString()!),
-                Low       = decimal.Parse(k.GetProperty("l").GetString()!),
-                Close     = decimal.Parse(k.GetProperty("c").GetString()!),
-                Volume    = decimal.Parse(k.GetProperty("v").GetString()!)
+                Open      = decimal.Parse(k.GetProperty("o").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                High      = decimal.Parse(k.GetProperty("h").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                Low       = decimal.Parse(k.GetProperty("l").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                Close     = decimal.Parse(k.GetProperty("c").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                Volume    = decimal.Parse(k.GetProperty("v").GetString()!, System.Globalization.CultureInfo.InvariantCulture)
             };
 
             // ① Fire existing event — TradingBotService subscribes here (DO NOT REMOVE)

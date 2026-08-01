@@ -87,6 +87,26 @@ public class WatchlistApiController : ControllerBase
         });
     }
 
+    [HttpDelete("{symbol}")]
+    public async Task<IActionResult> Remove(string symbol)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized(new { message = "Invalid token - user id missing" });
+
+        var cleanSymbol = (symbol ?? string.Empty).Trim().ToUpperInvariant();
+        var item = await _dbContext.WatchlistItems
+            .FirstOrDefaultAsync(w => w.UserId == userId && w.Symbol == cleanSymbol);
+
+        if (item == null)
+            return NotFound(new { message = "Symbol not found in watchlist" });
+
+        _dbContext.WatchlistItems.Remove(item);
+        await _dbContext.SaveChangesAsync();
+
+        return NoContent();
+    }
+
     private static string ToLookupSymbol(string input)
     {
         return input.Contains('.') ? input : $"{input}.N0000";

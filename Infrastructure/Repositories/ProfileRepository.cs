@@ -19,7 +19,7 @@ public class ProfileRepository
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
         if (profile == null)
-            throw new Exception("Profile not found");
+            return null;
 
         if (profileDto == null)
             throw new ArgumentNullException(nameof(profileDto));
@@ -46,7 +46,7 @@ public class ProfileRepository
         var profile = await _db.Profiles.FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
 
         if (profile == null)
-            throw new Exception("Profile not found");
+            return null;
 
         if (updateTelegramIdDto == null)
             throw new ArgumentNullException(nameof(updateTelegramIdDto));
