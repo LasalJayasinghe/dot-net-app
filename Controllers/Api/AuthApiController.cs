@@ -59,20 +59,31 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh([FromBody] string refreshToken)
+    public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
-        var token = await _userManager.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
+        if (request == null || string.IsNullOrWhiteSpace(request.RefreshToken))
+            return Unauthorized();
+
+        var token = await _userManager.Users.FirstOrDefaultAsync(u => u.RefreshToken == request.RefreshToken);
 
         if (token == null || token.RefreshTokenExpiry < DateTime.UtcNow)
             return Unauthorized();
 
         var user = await _userManager.FindByIdAsync(token.Id);
+        if (user == null)
+            return Unauthorized();
 
         var newAccessToken = await _tokenService.CreateTokenAsync(user);
         var newRefreshToken = _tokenService.GenerateRefreshToken();
 
+        user.RefreshToken = newRefreshToken;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
 
-        return Ok(new { accessToken = newAccessToken, refreshToken = newRefreshToken });
+        var updateResult = await _userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+            return BadRequest(updateResult.Errors);
+
+        return Ok(new { token = newAccessToken, accessToken = newAccessToken, refreshToken = newRefreshToken });
     }
 
     [HttpPost("logout")]
@@ -120,4 +131,9 @@ public class AuthController : ControllerBase
 
         return Ok(new { message = "Password changed successfully" });
     }
+}
+
+public class RefreshRequest
+{
+    public string RefreshToken { get; set; } = string.Empty;
 }
