@@ -83,6 +83,11 @@ public class StockIndicesDto
 public class StockIntraDay
 {
     public string symbol { get; set; } = default!;
+    public string? name { get; set; }
     public decimal price { get; set; }
+    public decimal high { get; set; }
+    public decimal low { get; set; }
+    public decimal change { get; set; }
     public decimal percentage { get; set; }
+    public decimal volatility { get; set; }
 }

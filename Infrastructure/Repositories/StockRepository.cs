@@ -119,10 +119,15 @@ public class StockRepository
             .Select(s => new StockIntraDay
             {
                 symbol = s.Symbol,
-                price = s.ClosingPrice,
-                percentage = ((s.High - s.Low) / (s.Low == 0 ? 1 : s.Low)) * 100
+                name = s.Name,
+                price = s.Price > 0 ? s.Price : s.ClosingPrice,
+                high = s.High,
+                low = s.Low,
+                change = s.Change,
+                percentage = s.PercentageChange,
+                volatility = s.Low > 0 ? ((s.High - s.Low) / s.Low) * 100 : 0
             })
-            .OrderByDescending(s => s.percentage)
+            .OrderByDescending(s => Math.Abs(s.percentage))
             .Take(50)
             .ToListAsync();
     }
