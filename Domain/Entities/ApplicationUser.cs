@@ -7,4 +7,5 @@ public class ApplicationUser : IdentityUser
     public DateTime? RefreshTokenExpiry { get; set; }
     public Profile Profile { get; set; } = null!;
     public ICollection<WatchlistItem> WatchlistItems { get; set; } = new List<WatchlistItem>();
+    public ICollection<Portfolio> Portfolios { get; set; } = new List<Portfolio>();
 }

@@ -8,6 +8,7 @@ using dotnetApp.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using dotnetApp.Application.Services;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -60,6 +61,7 @@ builder.Services.AddScoped<ProfileRepository>();
 // builder.Services.AddScoped<AppDbContext>();
 builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<IPdfSyncService, PdfSyncService>();
 
 builder.Services.AddHttpClient<TelegramService>();
 
@@ -70,6 +72,7 @@ builder.Services.AddSingleton<TradingBotService>();
 // Crypto Dashboard services
 builder.Services.AddScoped<ICryptoMarketService, CryptoMarketService>();
 builder.Services.AddScoped<IAiMarketSummaryService, AiMarketSummaryService>();
+builder.Services.AddScoped<dotnetApp.Application.Services.PortfolioService>();
 
 // Named HttpClient for Binance REST API — no API keys needed for public endpoints
 builder.Services.AddHttpClient("binance", client =>

@@ -13,6 +13,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<MarketIndices> MarketIndices { get; set; } = null!;
     public DbSet<Profile> Profiles { get; set; } = null!;
     public DbSet<WatchlistItem> WatchlistItems { get; set; } = null!;
+    public DbSet<Portfolio> Portfolios { get; set; } = null!;
+    public DbSet<PortfolioHolding> PortfolioHoldings { get; set; } = null!;
+    public DbSet<CurrencyExchangeRate> CurrencyExchangeRates { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -94,6 +97,57 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany(u => u.WatchlistItems)
                 .HasForeignKey(w => w.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Portfolio ──────────────────────────────────────────────────────────
+        builder.Entity<Portfolio>(entity =>
+        {
+            entity.ToTable("Portfolios");
+            entity.HasKey(p => p.Id);
+
+            entity.Property(p => p.Name).IsRequired().HasMaxLength(100);
+            entity.Property(p => p.BaseCurrency).IsRequired().HasMaxLength(10);
+            entity.Property(p => p.Type).HasConversion<string>();
+            entity.Property(p => p.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+            entity.HasOne(p => p.User)
+                .WithMany(u => u.Portfolios)
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── PortfolioHolding ───────────────────────────────────────────────────
+        builder.Entity<PortfolioHolding>(entity =>
+        {
+            entity.ToTable("PortfolioHoldings");
+            entity.HasKey(h => h.Id);
+
+            entity.Property(h => h.Symbol).IsRequired().HasMaxLength(30);
+            entity.Property(h => h.AssetType).HasConversion<string>();
+            entity.Property(h => h.Quantity).HasColumnType("decimal(28,8)");
+            entity.Property(h => h.AverageBuyPrice).HasColumnType("decimal(28,8)");
+            entity.Property(h => h.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+            entity.Property(h => h.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+            // A portfolio cannot have duplicate symbols
+            entity.HasIndex(h => new { h.PortfolioId, h.Symbol }).IsUnique();
+
+            entity.HasOne(h => h.Portfolio)
+                .WithMany(p => p.Holdings)
+                .HasForeignKey(h => h.PortfolioId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── CurrencyExchangeRate ───────────────────────────────────────────────
+        builder.Entity<CurrencyExchangeRate>(entity =>
+        {
+            entity.ToTable("CurrencyExchangeRates");
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Rate).HasColumnType("decimal(18,6)");
+            entity.Property(r => r.LastUpdated).HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+            // e.g. only one USDT -> LKR row at any time
+            entity.HasIndex(r => new { r.FromCurrency, r.ToCurrency }).IsUnique();
         });
     }
 
