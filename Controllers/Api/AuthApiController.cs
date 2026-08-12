@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using Google.Apis.Auth;
 
 namespace dotnetApp.Controllers.Api;
 
@@ -55,6 +56,80 @@ public class AuthController : ControllerBase
             refreshToken = refreshToken,
             firstName = profile.FirstName,
             lastName = profile.LastName,
+        });
+    }
+
+    [HttpPost("google-login")]
+    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.IdToken))
+            return BadRequest("ID token is missing.");
+
+        GoogleJsonWebSignature.Payload payload;
+        try
+        {
+            // You can optionally pass validation settings here, including the specific Client ID to validate against.
+            // For now, we'll use the default validation which checks the signature against Google's public keys.
+            payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken);
+        }
+        catch (InvalidJwtException)
+        {
+            return Unauthorized("Invalid Google ID token.");
+        }
+
+        if (string.IsNullOrEmpty(payload.Email))
+            return BadRequest("Google account has no email address.");
+
+        // Check if user exists
+        var user = await _userManager.FindByEmailAsync(payload.Email);
+        Profile profile = null;
+
+        if (user == null)
+        {
+            // Create user
+            user = new ApplicationUser
+            {
+                UserName = payload.Email,
+                Email = payload.Email,
+                EmailConfirmed = true
+            };
+            
+            var createResult = await _userManager.CreateAsync(user);
+            if (!createResult.Succeeded)
+                return BadRequest("Failed to create user account.");
+
+            // Assign role
+            await _userManager.AddToRoleAsync(user, "User");
+
+            // Create profile
+            profile = new Profile
+            {
+                UserId = user.Id,
+                FirstName = payload.GivenName ?? "User",
+                LastName = payload.FamilyName ?? "",
+                Bio = ""
+            };
+            
+            await _profileRepository.AddProfileAsync(profile);
+        }
+        else
+        {
+            profile = await _profileRepository.GetProfileByUserIdAsync(user.Id, CancellationToken.None);
+        }
+
+        var token = await _tokenService.CreateTokenAsync(user);
+        var refreshToken = _tokenService.GenerateRefreshToken();
+
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+        await _userManager.UpdateAsync(user);
+
+        return Ok(new
+        {
+            token = token,
+            refreshToken = refreshToken,
+            firstName = profile?.FirstName ?? payload.GivenName ?? "User",
+            lastName = profile?.LastName ?? payload.FamilyName ?? ""
         });
     }
 
@@ -137,4 +212,9 @@ public class AuthController : ControllerBase
 public class RefreshRequest
 {
     public string RefreshToken { get; set; } = string.Empty;
+}
+
+public class GoogleLoginRequest
+{
+    public string IdToken { get; set; } = string.Empty;
 }
