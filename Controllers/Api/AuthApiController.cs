@@ -5,6 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Google.Apis.Auth;
 
+using dotnetApp.Application.Dtos;
+using dotnetApp.Application.Interface;
+using dotnetApp.Infrastructure.Data;
+
 namespace dotnetApp.Controllers.Api;
 
 [ApiController]
@@ -14,13 +18,23 @@ public class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly TokenService _tokenService;
     private readonly ProfileRepository _profileRepository;
+    private readonly AppDbContext _context;
+    private readonly IBrevoEmailService _brevoEmailService;
 
-    public AuthController(UserManager<ApplicationUser> userManager, TokenService tokenService, ProfileRepository profileRepository)
+    public AuthController(
+        UserManager<ApplicationUser> userManager,
+        TokenService tokenService,
+        ProfileRepository profileRepository,
+        AppDbContext context,
+        IBrevoEmailService brevoEmailService)
     {
         _userManager = userManager;
         _tokenService = tokenService;
         _profileRepository = profileRepository;
+        _context = context;
+        _brevoEmailService = brevoEmailService;
     }
+
 
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto model)
@@ -207,7 +221,184 @@ public class AuthController : ControllerBase
 
         return Ok(new { message = "Password changed successfully" });
     }
+
+    [HttpPost("send-otp")]
+    public async Task<IActionResult> SendOtp([FromBody] SendOtpDto request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest(new { message = "Email is required." });
+
+        var email = request.Email.Trim().ToLower();
+        var purpose = request.Purpose ?? "SignUp";
+
+        // Purpose Validation
+        if (purpose.Equals("SignUp", StringComparison.OrdinalIgnoreCase))
+        {
+            var existingUser = await _userManager.FindByEmailAsync(email);
+            if (existingUser != null)
+                return BadRequest(new { message = "An account with this email already exists. Please sign in." });
+        }
+        else if (purpose.Equals("ForgotPassword", StringComparison.OrdinalIgnoreCase))
+        {
+            var existingUser = await _userManager.FindByEmailAsync(email);
+            if (existingUser == null)
+                return BadRequest(new { message = "No registered account found with this email." });
+        }
+        else
+        {
+            return BadRequest(new { message = "Invalid OTP purpose." });
+        }
+
+        // Invalidate previous active OTPs for this email and purpose
+        var oldOtps = await _context.OtpRecords
+            .Where(o => o.Email == email && o.Purpose == purpose && !o.IsUsed)
+            .ToListAsync();
+
+        foreach (var old in oldOtps)
+        {
+            old.IsUsed = true;
+        }
+
+        // Generate 6-digit OTP code
+        var code = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+
+        var otpRecord = new OtpRecord
+        {
+            Email = email,
+            Code = code,
+            Purpose = purpose,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            IsUsed = false
+        };
+
+        _context.OtpRecords.Add(otpRecord);
+        await _context.SaveChangesAsync();
+
+        // Dispatch Email via Brevo
+        var emailSent = await _brevoEmailService.SendOtpEmailAsync(email, code, purpose);
+        if (!emailSent)
+        {
+            return StatusCode(500, new { message = "Failed to send verification email. Please try again." });
+        }
+
+        return Ok(new { message = "Verification code sent to your email." });
+    }
+
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterWithOtpDto request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest(new { message = "Email and password are required." });
+
+        var email = request.Email.Trim().ToLower();
+        var otpCode = request.OtpCode?.Trim();
+
+        if (string.IsNullOrWhiteSpace(otpCode))
+            return BadRequest(new { message = "Verification code is required." });
+
+        // Validate OTP from Database
+        var validOtp = await _context.OtpRecords
+            .Where(o => o.Email == email && o.Purpose == "SignUp" && !o.IsUsed && o.ExpiresAt > DateTime.UtcNow && o.Code == otpCode)
+            .OrderByDescending(o => o.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (validOtp == null)
+            return BadRequest(new { message = "Invalid or expired verification code." });
+
+        // Mark OTP as used
+        validOtp.IsUsed = true;
+
+        // Check if user already exists
+        var existingUser = await _userManager.FindByEmailAsync(email);
+        if (existingUser != null)
+            return BadRequest(new { message = "An account with this email already exists." });
+
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        };
+
+        var createResult = await _userManager.CreateAsync(user, request.Password);
+        if (!createResult.Succeeded)
+        {
+            var firstErr = createResult.Errors.FirstOrDefault()?.Description ?? "Failed to create user account.";
+            return BadRequest(new { message = firstErr });
+        }
+
+        await _userManager.AddToRoleAsync(user, "User");
+
+        var profile = new Profile
+        {
+            UserId = user.Id,
+            FirstName = !string.IsNullOrWhiteSpace(request.FirstName) ? request.FirstName : "Trader",
+            LastName = !string.IsNullOrWhiteSpace(request.LastName) ? request.LastName : "",
+            Bio = ""
+        };
+
+        await _profileRepository.AddProfileAsync(profile);
+        await _context.SaveChangesAsync();
+
+        var token = await _tokenService.CreateTokenAsync(user);
+        var refreshToken = _tokenService.GenerateRefreshToken();
+
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+        await _userManager.UpdateAsync(user);
+
+        return Ok(new
+        {
+            token = token,
+            refreshToken = refreshToken,
+            firstName = profile.FirstName,
+            lastName = profile.LastName
+        });
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordWithOtpDto request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.NewPassword))
+            return BadRequest(new { message = "Email and new password are required." });
+
+        var email = request.Email.Trim().ToLower();
+        var otpCode = request.OtpCode?.Trim();
+
+        if (string.IsNullOrWhiteSpace(otpCode))
+            return BadRequest(new { message = "Verification code is required." });
+
+        // Validate OTP from Database
+        var validOtp = await _context.OtpRecords
+            .Where(o => o.Email == email && o.Purpose == "ForgotPassword" && !o.IsUsed && o.ExpiresAt > DateTime.UtcNow && o.Code == otpCode)
+            .OrderByDescending(o => o.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (validOtp == null)
+            return BadRequest(new { message = "Invalid or expired verification code." });
+
+        // Mark OTP as used
+        validOtp.IsUsed = true;
+        await _context.SaveChangesAsync();
+
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null)
+            return BadRequest(new { message = "User account not found." });
+
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var resetResult = await _userManager.ResetPasswordAsync(user, resetToken, request.NewPassword);
+
+        if (!resetResult.Succeeded)
+        {
+            var firstErr = resetResult.Errors.FirstOrDefault()?.Description ?? "Failed to reset password.";
+            return BadRequest(new { message = firstErr });
+        }
+
+        return Ok(new { message = "Password reset successfully. You can now sign in with your new password." });
+    }
 }
+
 
 public class RefreshRequest
 {

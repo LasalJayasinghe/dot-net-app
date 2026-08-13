@@ -16,10 +16,22 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Portfolio> Portfolios { get; set; } = null!;
     public DbSet<PortfolioHolding> PortfolioHoldings { get; set; } = null!;
     public DbSet<CurrencyExchangeRate> CurrencyExchangeRates { get; set; } = null!;
+    public DbSet<OtpRecord> OtpRecords { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        builder.Entity<OtpRecord>(entity =>
+        {
+            entity.ToTable("OtpRecords");
+            entity.HasKey(o => o.Id);
+            entity.Property(o => o.Email).IsRequired().HasMaxLength(255);
+            entity.Property(o => o.Code).IsRequired().HasMaxLength(10);
+            entity.Property(o => o.Purpose).IsRequired().HasMaxLength(50);
+            entity.HasIndex(o => new { o.Email, o.Purpose, o.IsUsed });
+        });
+
         // builder.Entity<IdentityUser>(entity =>
         // {
         //     entity.Property(u => u.NormalizedUserName).HasMaxLength(191);

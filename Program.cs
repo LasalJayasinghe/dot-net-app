@@ -8,6 +8,7 @@ using dotnetApp.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using dotnetApp.Application.Interface;
 using dotnetApp.Application.Services;
 
 Log.Logger = new LoggerConfiguration()
@@ -64,6 +65,7 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IPdfSyncService, PdfSyncService>();
 
 builder.Services.AddHttpClient<TelegramService>();
+builder.Services.AddHttpClient<IBrevoEmailService, BrevoEmailService>();
 
 builder.Services.AddSingleton<BinanceService>();
 builder.Services.AddSingleton<IStrategy, EmaRsiStrategy>();
