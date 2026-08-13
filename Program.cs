@@ -161,6 +161,13 @@ builder.Services.AddCors(options =>
     });
 });
 
+var cs = builder.Configuration.GetConnectionString("DefaultConnection");
+if (cs != null)
+{
+    builder.Services.AddHealthChecks()
+        .AddMySql(cs);
+}
+
 var app = builder.Build();
 
 var binance = app.Services.GetRequiredService<BinanceService>();
@@ -208,6 +215,8 @@ app.Map("/error", () => Results.Problem());
 
 // SignalR hub endpoint for the Crypto Trading Dashboard
 app.MapHub<CryptoHub>("/hubs/crypto");
+
+app.MapHealthChecks("/health");
 
 
 app.Run();

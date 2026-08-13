@@ -21,12 +21,25 @@ public class AlertService
             .Where(alert => alert.IsActive)
             .ToListAsync(stoppingToken);
 
+        if (!alerts.Any()) return;
+
+        var symbols = alerts.Select(a => a.Symbol).Distinct().ToList();
+        var userIds = alerts.Select(a => a.CreatedBy).Distinct().ToList();
+
+        var stocks = await _dbContext.Stocks
+            .Where(s => symbols.Contains(s.Symbol))
+            .ToDictionaryAsync(s => s.Symbol, stoppingToken);
+
+        var profiles = await _dbContext.Profiles
+            .AsNoTracking()
+            .Where(p => userIds.Contains(p.UserId))
+            .ToDictionaryAsync(p => p.UserId, stoppingToken);
+
+        bool hasChanges = false;
+
         foreach (var alert in alerts)
         {
-            var existingStock = await _dbContext.Stocks.
-                FirstOrDefaultAsync(s => s.Symbol == alert.Symbol, stoppingToken);
-
-            if (existingStock == null)
+            if (!stocks.TryGetValue(alert.Symbol, out var existingStock))
             {
                 Console.WriteLine($"Stock data for {alert.Symbol} not found.");
                 continue;
@@ -37,20 +50,19 @@ public class AlertService
             {
                 try
                 {
-                    var userProfile = await _dbContext.Profiles
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(p => p.UserId == alert.CreatedBy, stoppingToken);
-
-                    long.TryParse(userProfile?.TelegramId, out long userChatId);
-
-                    await _telegramService.SendMessageAsync(
-                        userChatId, 
-                        $"Alert: {alert.Symbol} has reached the target price of {alert.TargetPrice:N2}. Current price: {existingStock.Price:N2}"
-                    );
+                    if (profiles.TryGetValue(alert.CreatedBy, out var userProfile) && 
+                        long.TryParse(userProfile.TelegramId, out long userChatId) && 
+                        userChatId != 0)
+                    {
+                        await _telegramService.SendMessageAsync(
+                            userChatId, 
+                            $"Alert: {alert.Symbol} has reached the target price of {alert.TargetPrice:N2}. Current price: {existingStock.Price:N2}"
+                        );
+                    }
 
                     alert.IsActive = false;
                     _dbContext.Alerts.Update(alert);
-                    await _dbContext.SaveChangesAsync(stoppingToken);
+                    hasChanges = true;
 
                     Console.WriteLine($"Alert triggered for {alert.Symbol} at price {existingStock.Price:N2}.");
                 }
@@ -59,6 +71,11 @@ public class AlertService
                     Console.WriteLine($"Error sending alert for {alert.Symbol}: {ex.Message}");
                 }
             }
+        }
+
+        if (hasChanges)
+        {
+            await _dbContext.SaveChangesAsync(stoppingToken);
         }
     }
 }

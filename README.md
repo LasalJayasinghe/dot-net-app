@@ -4,13 +4,12 @@
 
 ---
 
-## Table of Contents ...
+## Table of Contents
 
 1. [Project Overview](#project-overview)
 2. [Features](#features)
    - [Completed](#completed)
-   - [In Progress](#in-progress)
-   - [Planned](#planned)
+   - [TODO List](#todo-list)
 3. [Tech Stack](#tech-stack)
 
 ---
@@ -32,81 +31,64 @@ The goals of this project are:
 
 ### Completed
 
-- **Logging**
-  - Serilog implemented
-  - Daily log files created automatically
+- **Dashboard Interface (React)**
+  - Modern SPA built with Vite, React Router, and TailwindCSS
+  - Watchlist and Portfolio tracking
+  - Interactive charts using Recharts and Lightweight Charts
+  - Settings and User Profile pages
 
 - **User Authentication**
+  - Google OAuth Integration for the frontend
   - Basic login system
   - Roles: `User` / `Admin`
 
-- **Stock Data Integration**
+- **Stock & Crypto Data Integration**
   - Connected to **CSE API** for live stock prices
+  - Connected to **Binance WebSocket API** for real-time crypto updates
 
-- **Cryptocurrency Data**
-  - Connected to **Binance WebSocket API**
-  - Real-time crypto updates
+- **Algorithmic Trading & Alerts**
+  - Base logic for BTC trading algorithms
+  - Configurable alerts panel in the dashboard
 
 - **Telegram Bot**
-  - Sends messages to selected users
   - Base integration ready for alerts
+  - Sends messages to selected users
+
+- **Backend & Logging**
+  - .NET 9 MVC / Web API architecture
+  - Serilog implemented with automatic daily log files
 
 ---
 
-### In Progress
+### TODO List
 
-- **Alert System**
-  - Notifications based on CSE data
-  - Telegram integration for alerts
+- **Finalize Alert System**
+  - Link frontend alert configurations to backend processing logic.
+  - Implement the actual trigger mechanism for sending Telegram notifications based on CSE and Binance data.
 
-- **UI Improvements**
-  - Updating views for usability and clarity
+- **Trading Algorithm Execution**
+  - Complete the BTC trading logic using the Binance API.
+  - Build visualization for algorithm backtesting in the frontend.
 
-- **Trading Algorithm**
-  - BTC trading logic using Binance API
+- **Authentication & Security**
+  - Finalize secure token exchange (JWT) between the React frontend and the .NET backend.
+  - Implement advanced user roles and permission checks on API endpoints.
 
----
+- **Historical Data & Analytics**
+  - Aggregate historical data for better charting in the dashboard.
+  - Set up automated daily MySQL backups.
 
-### Planned / Future
-
-- Advanced **user roles and permissions**
-- **Historical data analytics** with charts
-- Additional notification channels: Email, Push
-- **Dashboard**: portfolio overview, live prices, alert summary
-- **Unit & Integration testing**
-- **Dockerization / Deployment scripts**
-- Automated **daily MySQL backups**
+- **DevOps & Testing**
+  - Write Unit & Integration tests for critical API routes.
+  - Create Dockerfiles and deployment scripts for the backend and frontend.
 
 ---
 
 ## Tech Stack
 
-- **Backend:** .NET 9 MVC
+- **Backend:** .NET 9 MVC / Web API
 - **Database:** MySQL
 - **Logging:** Serilog
 - **APIs:** CSE API, Binance WebSocket API
 - **Notifications:** Telegram Bot API
-- **Frontend:** Razor Views / Bootstrap (Angular planned)
-
----
-
-<!--
-
-Void : no async - no return
-Task : async - no return
-Task<type(int : string)> : async - return
-
-If you're building APIs →
-👉 use Task<ActionResult<T>>
-If you're writing services →
-👉 use Task<T>
-If you're writing sync logic →
-👉 use void or normal return types
-Never casually use async void
-🚀 Quick mental model
-void → “just run this”
-Task → “run this async”
-Task<T> → “run async and give me result”
-IActionResult → “return HTTP response”
-
- -->
+- **Frontend:** React, Vite, TailwindCSS, TanStack (Router/Query), Recharts, Google OAuth (in `insight-dashboard`)

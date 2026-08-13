@@ -1,19 +1,87 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using System.Threading.Tasks;
+using dotnetApp.Application.Models;
+using Microsoft.Extensions.Logging;
+
+namespace dotnetApp.Application.Services;
+
 public class TradingBotService
 {
     private readonly IStrategy _strategy;
     private readonly ILogger<TradingBotService> _logger;
     private readonly List<Candle> _candles = new();
-    private Position _position = new();
-
+    
     private readonly int _maxCandles = 200;
-    private decimal _walletBalance = 10000m; // Starting with $10,000
-    private readonly decimal _riskPercent = 0.02m;     // 2% risk per trade
-    private readonly decimal _riskRewardRatio = 2m;    // 1:2 RR
+    private readonly decimal _tradingFeePercent = 0.001m; // 0.10% per executed side
+    
+    private PaperTradingState _state = new();
+    private readonly string _stateFilePath = "PaperTradingState.json";
+    private readonly string _logFilePath = "PaperTrades.log";
 
     public TradingBotService(IStrategy strategy, ILogger<TradingBotService> logger)
     {
         _strategy = strategy;
         _logger = logger;
+        LoadState();
+    }
+
+    private void LoadState()
+    {
+        if (File.Exists(_stateFilePath))
+        {
+            try
+            {
+                var json = File.ReadAllText(_stateFilePath);
+                _state = JsonSerializer.Deserialize<PaperTradingState>(json) ?? new PaperTradingState();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load paper trading state. Starting fresh.");
+                _state = new PaperTradingState();
+            }
+        }
+    }
+
+    private void SaveState()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(_state, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(_stateFilePath, json);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save paper trading state.");
+        }
+    }
+
+    private void LogTrade(PaperTrade trade)
+    {
+        var logMessage = $"PAPER {trade.Side} {trade.Symbol}\n" +
+                         $"Price: {trade.ExecutionPrice:C}\n" +
+                         $"Quantity: {trade.Quantity}\n" +
+                         $"Gross: {trade.GrossValue:C}\n" +
+                         $"Fee: {trade.Fee:C}\n" +
+                         $"Net: {trade.NetValue:C}\n" +
+                         $"USD Balance: {_state.UsdBalance:C}\n" +
+                         $"BTC Balance: {_state.BtcBalance}\n" +
+                         $"Reason: {trade.Reason}\n" +
+                         $"Timestamp: {trade.Timestamp}\n" +
+                         $"----------------------------------------\n";
+                         
+        Console.WriteLine(logMessage);
+        
+        try
+        {
+            File.AppendAllText(_logFilePath, logMessage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write to PaperTrades.log");
+        }
     }
 
     public Task OnCandleClosed(Candle candle)
@@ -30,82 +98,98 @@ public class TradingBotService
             if (_candles.Count < 30)
                 return Task.CompletedTask;
 
-            if (_position.IsOpen)
+            // Map internal position state to expected Domain model position if strategy requires it
+            var strategyPosition = new Position
             {
-                var currentPrice = candle.Close;
-
-                // STOP LOSS HIT
-                if (currentPrice <= _position.StopLoss)
-                {
-                    Console.WriteLine($"STOP LOSS HIT @ {currentPrice}");
-
-                    _walletBalance += _position.Quantity * currentPrice;
-                    _position = new Position();
-
-                    return Task.CompletedTask;
-                }
-
-                // TAKE PROFIT HIT
-                if (currentPrice >= _position.TakeProfit)
-                {
-                    Console.WriteLine($"TAKE PROFIT HIT @ {currentPrice}");
-
-                    _walletBalance += _position.Quantity * currentPrice;
-                    _position = new Position();
-
-                    return Task.CompletedTask;
-                }
-            }
+                IsOpen = _state.IsOpen,
+                EntryPrice = _state.EntryPrice,
+                Quantity = _state.BtcBalance,
+                EntryTime = _state.EntryTime
+            };
 
             // 3. ASK STRATEGY
-            var signal = _strategy.Evaluate(_candles, _position);
+            var signal = _strategy.Evaluate(_candles, strategyPosition);
 
             if (signal == null)
                 return Task.CompletedTask;
 
-            Console.WriteLine($"Signal Test: {signal.Type} @ {signal.Price} - {signal.Reason}");
-
             // 4. EXECUTE TRADE
-            if (signal.Type == "BUY" && !_position.IsOpen)
+            if (signal.Type == "BUY" && !_state.IsOpen)
             {
-                var entry = signal.Price;
+                var entryPrice = signal.Price;
+                var totalAvailableUsd = _state.UsdBalance;
+                
+                // Calculate max BTC we can buy with available USD, accounting for 0.1% fee
+                // Net USD needed = (Qty * Price) + (Qty * Price * FeePercent) = Qty * Price * (1 + FeePercent)
+                // Qty = TotalUsd / (Price * (1 + FeePercent))
+                
+                var maxGrossValue = totalAvailableUsd / (1 + _tradingFeePercent);
+                var quantity = Math.Round(maxGrossValue / entryPrice, 6);
+                
+                if (quantity <= 0) return Task.CompletedTask;
+                
+                var grossValue = quantity * entryPrice;
+                var fee = grossValue * _tradingFeePercent;
+                var netUsdCost = grossValue + fee;
 
-                // 1. Calculate Stop Loss (2% below entry)
-                var stopLoss = entry * (1 - _riskPercent);
+                // Update state
+                _state.UsdBalance -= netUsdCost;
+                _state.BtcBalance += quantity;
+                _state.IsOpen = true;
+                _state.EntryPrice = entryPrice;
+                _state.EntryTime = DateTime.UtcNow;
 
-                // 2. Calculate Take Profit (RR = 1:2 → 4% above)
-                var takeProfit = entry * (1 + (_riskPercent * _riskRewardRatio));
-
-                // 3. Position size (still using full balance for now)
-                var quantity = Math.Round(_walletBalance / entry, 6);
-
-                _position = new Position
+                var trade = new PaperTrade
                 {
-                    IsOpen = true,
-                    EntryPrice = entry,
+                    Side = "BUY",
                     Quantity = quantity,
-                    StopLoss = stopLoss,
-                    TakeProfit = takeProfit
+                    ExecutionPrice = entryPrice,
+                    GrossValue = grossValue,
+                    Fee = fee,
+                    NetValue = grossValue, // BTC value
+                    Timestamp = DateTime.UtcNow,
+                    Reason = signal.Reason
                 };
-
-                _walletBalance -= quantity * entry;
-
-                _logger.LogInformation($"BUY Signal: {signal.Reason} @ {entry}");
-                _logger.LogInformation($"Wallet after BUY: {_walletBalance:C}");
-
-                Console.WriteLine($"BUY @ {entry}");
-                Console.WriteLine($"SL: {stopLoss} | TP: {takeProfit}");
+                _state.TradeHistory.Add(trade);
+                SaveState();
+                LogTrade(trade);
             }
-            else if (signal.Type == "SELL" && _position.IsOpen)
+            else if (signal.Type == "SELL" && _state.IsOpen)
             {
-                _logger.LogInformation($"SELL Signal: {signal.Reason} @ {signal.Price}");
-                _walletBalance += _position.Quantity * signal.Price;
-                _position = new Position { IsOpen = false };
-                Console.WriteLine($"Sold at {signal.Price}, new balance: {_walletBalance:C}");
-                _logger.LogInformation($"Wallet after SELL: {_walletBalance:C}");
+                var exitPrice = signal.Price;
+                var quantity = _state.BtcBalance;
+                
+                var grossProceeds = quantity * exitPrice;
+                var fee = grossProceeds * _tradingFeePercent;
+                var netUsdReceived = grossProceeds - fee;
+                
+                // Realized P/L calculation
+                var initialCost = quantity * _state.EntryPrice;
+                var realizedPnL = netUsdReceived - initialCost;
+
+                // Update state
+                _state.UsdBalance += netUsdReceived;
+                _state.BtcBalance = 0;
+                _state.IsOpen = false;
+                _state.EntryPrice = 0;
+                _state.EntryTime = null;
+
+                var trade = new PaperTrade
+                {
+                    Side = "SELL",
+                    Quantity = quantity,
+                    ExecutionPrice = exitPrice,
+                    GrossValue = grossProceeds,
+                    Fee = fee,
+                    NetValue = netUsdReceived,
+                    Timestamp = DateTime.UtcNow,
+                    Reason = $"{signal.Reason} (Realized P/L: {realizedPnL:C})"
+                };
+                _state.TradeHistory.Add(trade);
+                SaveState();
+                LogTrade(trade);
             }
 
-            _logger.LogInformation($"Signal: {signal.Type} @ {signal.Price}");
             return Task.CompletedTask;
         }
     }
