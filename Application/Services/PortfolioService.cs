@@ -57,7 +57,12 @@ public class PortfolioService
         foreach (var p in portfolios)
         {
             var (totalValue, totalCost) = await CalcPortfolioValueAsync(p);
-            decimal pnl        = totalValue - totalCost;
+            decimal pnl = totalValue - totalCost;
+            if (p.Type == PortfolioType.Stocks)
+            {
+                decimal salesCommission = totalValue * 1.12m / 100m;
+                pnl = (totalValue - salesCommission) - totalCost;
+            }
             decimal pnlPercent = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
 
             result.Add(new PortfolioSummaryDto
@@ -88,7 +93,12 @@ public class PortfolioService
         var holdingDtos = await BuildHoldingDtosAsync(portfolio);
         decimal totalValue = holdingDtos.Sum(h => h.CurrentValue);
         decimal totalCost  = holdingDtos.Sum(h => h.Quantity * h.AverageBuyPrice);
-        decimal pnl        = totalValue - totalCost;
+        decimal pnl = totalValue - totalCost;
+        if (portfolio.Type == PortfolioType.Stocks)
+        {
+            decimal salesCommission = totalValue * 1.12m / 100m;
+            pnl = (totalValue - salesCommission) - totalCost;
+        }
         decimal pnlPercent = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
 
         return ToDetailDto(portfolio, holdingDtos, totalValue, totalCost, pnl, pnlPercent);
@@ -193,6 +203,7 @@ public class PortfolioService
         // Get the exchange rates from DB
         decimal usdtToLkr = await GetExchangeRateAsync("USDT", "LKR");
         decimal lkrToUsdt = await GetExchangeRateAsync("LKR", "USDT");
+
         if (lkrToUsdt == 0 && usdtToLkr > 0) lkrToUsdt = 1m / usdtToLkr; // fallback
 
         decimal totalNetWorthLkr = 0;
@@ -204,7 +215,12 @@ public class PortfolioService
         foreach (var p in portfolios)
         {
             var (totalValue, totalCost) = await CalcPortfolioValueAsync(p);
-            decimal pnl        = totalValue - totalCost;
+            decimal pnl = totalValue - totalCost;
+            if (p.Type == PortfolioType.Stocks)
+            {
+                decimal salesCommission = totalValue * 1.12m / 100m;
+                pnl = (totalValue - salesCommission) - totalCost;
+            }
             decimal pnlPercent = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
 
             // Convert to display currency
@@ -302,8 +318,13 @@ public class PortfolioService
     {
         decimal currentValue = h.Quantity * currentPrice;
         decimal cost         = h.Quantity * h.AverageBuyPrice;
-        decimal pnl          = currentValue - cost;
-        decimal pnlPct       = cost > 0 ? (pnl / cost) * 100 : 0;
+        decimal pnl = currentValue - cost;
+        if (h.AssetType == AssetType.Stock)
+        {
+            decimal salesCommission = currentValue * 1.12m / 100m;
+            pnl = (currentValue - salesCommission) - cost;
+        }
+        decimal pnlPct = cost > 0 ? (pnl / cost) * 100 : 0;
 
         return new HoldingDto
         {
