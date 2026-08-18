@@ -50,17 +50,20 @@ public class StockService
 
             var existingStock = await _stockRepository.GetBySymbolAsync(symbol);
 
-            if (data != null && existingStock != null)
+            if (data != null && data.ReqSymbolInfo != null && !string.IsNullOrEmpty(data.ReqSymbolInfo.Symbol))
             {
-                existingStock.Price = data.ReqSymbolInfo.LastTradedPrice;
-                existingStock.PreviousClose = data.ReqSymbolInfo.PreviousClose;
-                existingStock.High = data.ReqSymbolInfo.High;
-                existingStock.Low = data.ReqSymbolInfo.Low;
-                existingStock.ClosingPrice = data.ReqSymbolInfo.ClosingPrice;
-                existingStock.PercentageChange = data.ReqSymbolInfo.PercentageChange;
-                existingStock.Change = data.ReqSymbolInfo.Change;
+                if (existingStock != null)
+                {
+                    existingStock.Price = data.ReqSymbolInfo.LastTradedPrice;
+                    existingStock.PreviousClose = data.ReqSymbolInfo.PreviousClose;
+                    existingStock.High = data.ReqSymbolInfo.High;
+                    existingStock.Low = data.ReqSymbolInfo.Low;
+                    existingStock.ClosingPrice = data.ReqSymbolInfo.ClosingPrice;
+                    existingStock.PercentageChange = data.ReqSymbolInfo.PercentageChange;
+                    existingStock.Change = data.ReqSymbolInfo.Change;
 
-                await _stockRepository.SaveChangesAsync();
+                    await _stockRepository.SaveChangesAsync();
+                }
                 return data;
             }
             return null;
