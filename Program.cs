@@ -23,6 +23,9 @@ Log.Logger = new LoggerConfiguration()
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Required for ExcelDataReader
+System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     var cs = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -62,7 +65,7 @@ builder.Services.AddScoped<ProfileRepository>();
 // builder.Services.AddScoped<AppDbContext>();
 builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<TokenService>();
-builder.Services.AddScoped<IPdfSyncService, PdfSyncService>();
+builder.Services.AddScoped<IPortfolioFileSyncService, PortfolioFileSyncService>();
 
 builder.Services.AddHttpClient<TelegramService>();
 builder.Services.AddHttpClient<IBrevoEmailService, BrevoEmailService>();

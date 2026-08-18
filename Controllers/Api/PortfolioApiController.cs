@@ -29,18 +29,18 @@ public class PortfolioApiController : ControllerBase
     private readonly PortfolioService _portfolioService;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<PortfolioApiController> _logger;
-    private readonly IPdfSyncService _pdfSyncService;
+    private readonly IPortfolioFileSyncService _fileSyncService;
 
     public PortfolioApiController(
         PortfolioService portfolioService,
         UserManager<ApplicationUser> userManager,
         ILogger<PortfolioApiController> logger,
-        IPdfSyncService pdfSyncService)
+        IPortfolioFileSyncService fileSyncService)
     {
         _portfolioService = portfolioService;
         _userManager      = userManager;
         _logger           = logger;
-        _pdfSyncService   = pdfSyncService;
+        _fileSyncService   = fileSyncService;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -186,11 +186,11 @@ public class PortfolioApiController : ControllerBase
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // POST /api/portfolios/{id}/sync-pdf
+    // POST /api/portfolios/{id}/sync-file
     // ─────────────────────────────────────────────────────────────────────────
 
-    [HttpPost("{id:int}/sync-pdf")]
-    public async Task<IActionResult> SyncPdf(int id, IFormFile file)
+    [HttpPost("{id:int}/sync-file")]
+    public async Task<IActionResult> SyncFile(int id, IFormFile file)
     {
         var userId = _userManager.GetUserId(User);
         if (userId == null) return Unauthorized();
@@ -201,17 +201,27 @@ public class PortfolioApiController : ControllerBase
         if (file.Length > 5 * 1024 * 1024)
             return BadRequest("File size exceeds 5MB limit.");
 
-        if (file.ContentType != "application/pdf")
-            return BadRequest("Only PDF files are allowed.");
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext != ".pdf" && ext != ".xlsx" && ext != ".xls")
+            return BadRequest("Only PDF and Excel files are allowed.");
 
         try
         {
             using var stream = file.OpenReadStream();
-            var parsedHoldings = _pdfSyncService.ParseATradPortfolio(stream);
+            var parsedHoldings = new List<ParsedHoldingDto>();
+
+            if (ext == ".pdf")
+            {
+                parsedHoldings = _fileSyncService.ParsePdf(stream);
+            }
+            else
+            {
+                parsedHoldings = _fileSyncService.ParseExcel(stream);
+            }
 
             if (!parsedHoldings.Any())
             {
-                return BadRequest("No valid holdings were extracted from the PDF. Ensure it is an ATrad Online Client Portfolio report.");
+                return BadRequest("No valid holdings were extracted from the file. Ensure it is an ATrad Online Client Portfolio report.");
             }
 
             await _portfolioService.SyncHoldingsAsync(id, userId, parsedHoldings);
@@ -219,8 +229,8 @@ public class PortfolioApiController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error syncing PDF for portfolio {Id}", id);
-            return StatusCode(500, $"An error occurred while parsing the PDF: {ex.Message}");
+            _logger.LogError(ex, "Error syncing file for portfolio {Id}", id);
+            return StatusCode(500, $"An error occurred while parsing the file: {ex.Message}");
         }
     }
 }

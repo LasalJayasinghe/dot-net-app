@@ -1,20 +1,23 @@
 using System.Text.RegularExpressions;
 using UglyToad.PdfPig;
 using dotnetApp.Application.Dtos;
+using ExcelDataReader;
+using System.IO;
 
 namespace dotnetApp.Application.Services
 {
-    public interface IPdfSyncService
+    public interface IPortfolioFileSyncService
     {
-        List<ParsedHoldingDto> ParseATradPortfolio(Stream pdfStream);
+        List<ParsedHoldingDto> ParsePdf(Stream pdfStream);
+        List<ParsedHoldingDto> ParseExcel(Stream excelStream);
     }
 
-    public class PdfSyncService : IPdfSyncService
+    public class PortfolioFileSyncService : IPortfolioFileSyncService
     {
         // Matches CSE symbols like AEL.N0000, JKH.N0000, etc.
         private static readonly Regex SymbolRegex = new Regex(@"^[A-Z0-9]{3,4}\.[A-Z0-9]{5}$", RegexOptions.Compiled);
 
-        public List<ParsedHoldingDto> ParseATradPortfolio(Stream pdfStream)
+        public List<ParsedHoldingDto> ParsePdf(Stream pdfStream)
         {
             var holdings = new List<ParsedHoldingDto>();
 
@@ -25,7 +28,6 @@ namespace dotnetApp.Application.Services
                     var words = page.GetWords();
 
                     // Group words by approximate Y coordinate (bottom of text bounding box)
-                    // This perfectly reconstructs rows, avoiding column text interweaving
                     var lines = words
                         .GroupBy(w => Math.Round(w.BoundingBox.Bottom))
                         .OrderByDescending(g => g.Key)
@@ -41,11 +43,9 @@ namespace dotnetApp.Application.Services
                         {
                             try
                             {
-                                // Reconstruct the line as a space-separated string
                                 var lineText = string.Join(" ", line.Select(w => w.Text));
                                 var parts = lineText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-                                // Expected positions: [0] Symbol, [1] Quantity, ..., [7] AvgPrice
                                 if (parts.Length >= 8)
                                 {
                                     var symbol = parts[0];
@@ -64,13 +64,51 @@ namespace dotnetApp.Application.Services
                                     });
                                 }
                             }
-                            catch
-                            {
-                                // Skip malformed rows
-                            }
+                            catch { /* Skip malformed rows */ }
                         }
                     }
                 }
+            }
+
+            return holdings;
+        }
+
+        public List<ParsedHoldingDto> ParseExcel(Stream excelStream)
+        {
+            var holdings = new List<ParsedHoldingDto>();
+
+            using (var reader = ExcelReaderFactory.CreateReader(excelStream))
+            {
+                do
+                {
+                    while (reader.Read())
+                    {
+                        try
+                        {
+                            var firstCell = reader.GetValue(0)?.ToString()?.Trim();
+                            if (!string.IsNullOrEmpty(firstCell) && SymbolRegex.IsMatch(firstCell))
+                            {
+                                var qtyObj = reader.GetValue(1);
+                                var avgPriceObj = reader.GetValue(7);
+
+                                if (qtyObj != null && avgPriceObj != null)
+                                {
+                                    if (decimal.TryParse(qtyObj.ToString(), out var quantity) &&
+                                        decimal.TryParse(avgPriceObj.ToString(), out var avgPrice))
+                                    {
+                                        holdings.Add(new ParsedHoldingDto
+                                        {
+                                            Symbol = firstCell,
+                                            Quantity = quantity,
+                                            AverageBuyPrice = avgPrice
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        catch { /* Skip malformed rows */ }
+                    }
+                } while (reader.NextResult());
             }
 
             return holdings;
