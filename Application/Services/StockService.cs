@@ -206,10 +206,13 @@ public class StockService
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://www.cse.lk/api/topGainers");
+            var response = await _httpClient.PostAsync("https://www.cse.lk/api/topGainers", null);
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
+            var logContent = content.Length > 1000 ? content[..1000] + "..." : content;
+            _logger.LogInformation("TopGainers response content: {ResponseContent}", logContent);
+
             var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -229,7 +232,7 @@ public class StockService
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://www.cse.lk/api/topLooses");
+            var response = await _httpClient.PostAsync("https://www.cse.lk/api/topLooses", null);
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
