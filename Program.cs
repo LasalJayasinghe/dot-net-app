@@ -79,6 +79,20 @@ builder.Services.AddScoped<ICryptoMarketService, CryptoMarketService>();
 builder.Services.AddScoped<IAiMarketSummaryService, AiMarketSummaryService>();
 builder.Services.AddScoped<dotnetApp.Application.Services.PortfolioService>();
 
+// AI Chat Integration
+builder.Services.AddHttpClient<AiAgentService>(client =>
+{
+    var baseUrl = builder.Configuration["Ollama:BaseUrl"] ?? "http://localhost:11434";
+    client.BaseAddress = new Uri(baseUrl);
+});
+builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetNetWorthTool>();
+builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetStockDataTool>();
+builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetBinanceTickerTool>();
+builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetMarketStatusTool>();
+builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetTopGainersTool>();
+builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetTopLosersTool>();
+builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetProfileTool>();
+
 // Named HttpClient for Binance REST API — no API keys needed for public endpoints
 builder.Services.AddHttpClient("binance", client =>
 {

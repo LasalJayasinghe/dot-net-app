@@ -92,3 +92,5 @@ The goals of this project are:
 - **APIs:** CSE API, Binance WebSocket API
 - **Notifications:** Telegram Bot API
 - **Frontend:** React, Vite, TailwindCSS, TanStack (Router/Query), Recharts, Google OAuth (in `insight-dashboard`)
+
+<!-- need to look into semantic kernel, (replace ai agent layer with it) -->
