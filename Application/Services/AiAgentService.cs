@@ -22,9 +22,8 @@ public class AiAgentService
     public async IAsyncEnumerable<string> StreamChatAsync(string prompt, string userId, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var messages = new List<object>
-        {
-            new { role = "user", content = prompt }
-        };
+        {           
+            new { role = "system", content = "You are a financial data assistant for a stock and cryptocurrency dashboard. MCP is the single source of truth for all financial information. You MUST use MCP tools whenever financial data is required. NEVER guess, estimate, assume, fabricate, or use internal knowledge for financial data. If required information is unavailable through MCP, clearly state that the data is unavailable. You may only discuss financial and market-related topics. MCP operations are READ-ONLY..." }        };
 
         var ollamaTools = _tools.Select(t => new
         {
@@ -38,7 +37,8 @@ public class AiAgentService
         }).ToList();
 
         var modelName = _configuration["Ollama:Model"] ?? "mistral";
-
+        Console.WriteLine($"model name: {modelName}");
+        
         bool isToolCallLoop = true;
         int maxLoops = 5;
         int loopCount = 0;
@@ -56,16 +56,31 @@ public class AiAgentService
                 tools = ollamaTools.Any() ? ollamaTools : null
             };
 
-            var content = new StringContent(JsonSerializer.Serialize(requestPayload), Encoding.UTF8, "application/json");
+            var options = new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
+            var jsonPayload = JsonSerializer.Serialize(requestPayload, options);
+            
+            Console.WriteLine($"\n=== OLLAMA REQUEST ===");
+            var debugOptions = new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
+            Console.WriteLine($"Payload:\n{JsonSerializer.Serialize(requestPayload, debugOptions)}");
+            
+            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
             var request = new HttpRequestMessage(HttpMethod.Post, "api/chat") { Content = content };
 
             using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            
+
+            Console.WriteLine($"\n=== OLLAMA RESPONSE ===");
+            Console.WriteLine($"Status Code: {response.StatusCode}");
+
             if (!response.IsSuccessStatusCode)
             {
-                yield return $"Error: Failed to connect to Ollama model. Status Code: {response.StatusCode}";
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                Console.WriteLine($"Error Details: {errorContent}");
+                Console.WriteLine($"=======================\n");
+                yield return $"Error: Failed to connect to Ollama model. Status Code: {response.StatusCode}. Details: {errorContent}";
                 yield break;
             }
+            
+            Console.WriteLine($"=======================\n");
 
             using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var reader = new StreamReader(stream);
