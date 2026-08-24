@@ -84,6 +84,8 @@ builder.Services.AddHttpClient<AiAgentService>(client =>
 {
     var baseUrl = builder.Configuration["Ollama:BaseUrl"] ?? "http://localhost:11434";
     client.BaseAddress = new Uri(baseUrl);
+    var timeoutSeconds = builder.Configuration.GetValue<int?>("Ollama:TimeoutSeconds") ?? 300;
+    client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 });
 builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetNetWorthTool>();
 builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetStockDataTool>();
@@ -92,6 +94,7 @@ builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp
 builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetTopGainersTool>();
 builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetTopLosersTool>();
 builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetProfileTool>();
+builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetPortfolioHoldingsTool>();
 
 // Named HttpClient for Binance REST API — no API keys needed for public endpoints
 builder.Services.AddHttpClient("binance", client =>
