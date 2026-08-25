@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using dotnetApp.Infrastructure.Data;
+using dotnetApp.Application.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace dotnetApp.Controllers.Api;
@@ -12,11 +13,13 @@ namespace dotnetApp.Controllers.Api;
 public class SettingsApiController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly BinanceP2pService _p2pService;
     public static readonly Dictionary<string, UserSettingsDto> Store = new();
 
-    public SettingsApiController(AppDbContext db)
+    public SettingsApiController(AppDbContext db, BinanceP2pService p2pService)
     {
         _db = db;
+        _p2pService = p2pService;
     }
 
     [HttpGet]
@@ -40,10 +43,33 @@ public class SettingsApiController : ControllerBase
         var usdtToLkr = await _db.CurrencyExchangeRates.FirstOrDefaultAsync(r => r.FromCurrency == "USDT" && r.ToCurrency == "LKR");
         var lkrToUsdt = await _db.CurrencyExchangeRates.FirstOrDefaultAsync(r => r.FromCurrency == "LKR" && r.ToCurrency == "USDT");
 
-        settings.UsdtToLkrRate = usdtToLkr?.Rate ?? 300m;
-        settings.LkrToUsdtRate = lkrToUsdt?.Rate ?? 0.0033m;
+        // If rate is missing or older than 24 hours (once a day), auto refresh from Binance P2P
+        if (usdtToLkr == null || (DateTime.UtcNow - usdtToLkr.LastUpdated).TotalHours > 24)
+        {
+            var (rateUsdtLkr, rateLkrUsdt) = await _p2pService.FetchAndUpdateUsdtLkrRateAsync();
+            settings.UsdtToLkrRate = rateUsdtLkr;
+            settings.LkrToUsdtRate = rateLkrUsdt;
+        }
+        else
+        {
+            settings.UsdtToLkrRate = usdtToLkr.Rate;
+            settings.LkrToUsdtRate = lkrToUsdt?.Rate ?? (1m / usdtToLkr.Rate);
+        }
 
         return Ok(settings);
+    }
+
+    [HttpPost("sync-exchange-rate")]
+    public async Task<IActionResult> SyncExchangeRate()
+    {
+        var (usdtToLkr, lkrToUsdt) = await _p2pService.FetchAndUpdateUsdtLkrRateAsync();
+        return Ok(new
+        {
+            message = "USDT/LKR exchange rate successfully synced from Binance P2P API.",
+            usdtToLkrRate = usdtToLkr,
+            lkrToUsdtRate = lkrToUsdt,
+            lastUpdated = DateTime.UtcNow
+        });
     }
 
     [HttpPut]

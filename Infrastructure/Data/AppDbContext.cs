@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 
+using dotnetApp.Domain.Entities;
+
 namespace dotnetApp.Infrastructure.Data;
 
 public class AppDbContext : IdentityDbContext<ApplicationUser>
@@ -17,6 +19,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<PortfolioHolding> PortfolioHoldings { get; set; } = null!;
     public DbSet<CurrencyExchangeRate> CurrencyExchangeRates { get; set; } = null!;
     public DbSet<OtpRecord> OtpRecords { get; set; } = null!;
+    public DbSet<NewsArticle> NewsArticles { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -161,6 +164,23 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             // e.g. only one USDT -> LKR row at any time
             entity.HasIndex(r => new { r.FromCurrency, r.ToCurrency }).IsUnique();
         });
-    }
 
+        // ── NewsArticle ────────────────────────────────────────────────────────
+        builder.Entity<NewsArticle>(entity =>
+        {
+            entity.ToTable("NewsArticles");
+            entity.HasKey(n => n.Id);
+            entity.Property(n => n.ExternalId).IsRequired().HasMaxLength(255);
+            entity.Property(n => n.Title).IsRequired().HasMaxLength(500);
+            entity.Property(n => n.Source).HasMaxLength(150);
+            entity.Property(n => n.MarketCategory).HasMaxLength(50);
+            entity.Property(n => n.Sentiment).HasMaxLength(30);
+
+            entity.HasIndex(n => n.ExternalId).IsUnique();
+            entity.HasIndex(n => n.MarketCategory);
+            entity.HasIndex(n => n.PublishedAt);
+            entity.HasIndex(n => n.IsModelValidated);
+            entity.HasIndex(n => n.IsRelevant);
+        });
+    }
 }

@@ -10,6 +10,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using dotnetApp.Application.Interface;
 using dotnetApp.Application.Services;
+using dotnetApp.Application.Services.NewsProviders;
+using dotnetApp.Jobs;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -95,6 +97,24 @@ builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp
 builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetTopLosersTool>();
 builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetProfileTool>();
 builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetPortfolioHoldingsTool>();
+builder.Services.AddScoped<dotnetApp.Application.Services.Ai.IMcpTool, dotnetApp.Application.Services.Ai.Tools.GetMarketNewsTool>();
+
+// News Ingestion Multi-Provider Pipeline
+builder.Services.AddHttpClient<WorldNewsApiProvider>();
+builder.Services.AddHttpClient<RssFeedNewsProvider>();
+builder.Services.AddTransient<INewsProvider, WorldNewsApiProvider>();
+builder.Services.AddTransient<INewsProvider, RssFeedNewsProvider>();
+builder.Services.AddScoped<NewsIngestionService>();
+builder.Services.AddHostedService<NewsIngestionJob>();
+
+// Async Background News Validation Pipeline (Ollama LLM)
+builder.Services.AddHttpClient<NewsValidationService>();
+builder.Services.AddScoped<NewsValidationService>();
+builder.Services.AddHostedService<NewsValidationJob>();
+
+// Binance P2P Rate Sync Service & Job
+builder.Services.AddHttpClient<BinanceP2pService>();
+builder.Services.AddHostedService<ExchangeRateJob>();
 
 // Named HttpClient for Binance REST API — no API keys needed for public endpoints
 builder.Services.AddHttpClient("binance", client =>

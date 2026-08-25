@@ -1,9 +1,9 @@
 {
-  "UsdBalance": 0.01207114008000000,
-  "BtcBalance": 0.012842,
-  "IsOpen": true,
-  "EntryPrice": 77790.76000000,
-  "EntryTime": "2026-08-21T10:10:00.4778418Z",
+  "UsdBalance": 991.08120454548000000,
+  "BtcBalance": 0,
+  "IsOpen": false,
+  "EntryPrice": 0,
+  "EntryTime": null,
   "TradeHistory": [
     {
       "Id": "2e627260-2b9d-4769-9d1d-2b5a1e39a92b",
@@ -16,6 +16,18 @@
       "NetValue": 998.98893992000000,
       "Timestamp": "2026-08-21T10:10:00.4798252Z",
       "Reason": "EMA crossover \u002B RSI oversold"
+    },
+    {
+      "Id": "8f6093e7-b77b-484c-972f-8a60dac95b6f",
+      "Symbol": "BTCUSDT",
+      "Side": "SELL",
+      "Quantity": 0.012842,
+      "ExecutionPrice": 77251.30000000,
+      "GrossValue": 992.06119460000000,
+      "Fee": 0.99206119460000000,
+      "NetValue": 991.06913340540000000,
+      "Timestamp": "2026-08-22T18:10:01.8990423Z",
+      "Reason": "EMA bearish crossover (Realized P/L: ($7.92))"
     }
   ]
 }
