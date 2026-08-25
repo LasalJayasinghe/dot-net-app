@@ -12,7 +12,7 @@ using dotnetApp.Infrastructure.Data;
 namespace dotnetApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260825094401_AddNewsValidationFlags")]
+    [Migration("20260825102033_AddNewsValidationFlags")]
     partial class AddNewsValidationFlags
     {
         /// <inheritdoc />
@@ -587,6 +587,12 @@ namespace dotnetApp.Migrations
                     b.Property<int>("ImportanceScore")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsModelValidated")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsRelevant")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("MarketCategory")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -626,6 +632,10 @@ namespace dotnetApp.Migrations
 
                     b.HasIndex("ExternalId")
                         .IsUnique();
+
+                    b.HasIndex("IsModelValidated");
+
+                    b.HasIndex("IsRelevant");
 
                     b.HasIndex("MarketCategory");
 

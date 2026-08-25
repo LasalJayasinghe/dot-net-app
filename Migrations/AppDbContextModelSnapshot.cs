@@ -584,6 +584,12 @@ namespace dotnetApp.Migrations
                     b.Property<int>("ImportanceScore")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsModelValidated")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsRelevant")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("MarketCategory")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -623,6 +629,10 @@ namespace dotnetApp.Migrations
 
                     b.HasIndex("ExternalId")
                         .IsUnique();
+
+                    b.HasIndex("IsModelValidated");
+
+                    b.HasIndex("IsRelevant");
 
                     b.HasIndex("MarketCategory");
 
