@@ -65,6 +65,7 @@ public class NewsValidationService
         sb.AppendLine("- importance: (number 1-10)");
         sb.AppendLine("- tickers: (array of stock/crypto symbols, e.g. [\"COMB.N0000\", \"BTCUSDT\"])");
         sb.AppendLine("- summary: (1-2 sentence trader summary)");
+        sb.AppendLine("- reasoning: (1-2 sentence explanation of why the AI assigned this relevance, sentiment, and category)");
         sb.AppendLine("\nArticles:");
 
         for (int idx = 0; idx < pendingArticles.Count; idx++)
@@ -82,7 +83,7 @@ public class NewsValidationService
             format = "json",
             options = new
             {
-                num_predict = 300,
+                num_predict = 400,
                 temperature = 0.1
             }
         };
@@ -148,6 +149,7 @@ public class NewsValidationService
                         var sent = element.TryGetProperty("sentiment", out var sProp) ? sProp.GetString() ?? "NEUTRAL" : "NEUTRAL";
                         var imp = element.TryGetProperty("importance", out var imProp) && imProp.TryGetInt32(out var impVal) ? impVal : 5;
                         var summary = element.TryGetProperty("summary", out var sumProp) ? sumProp.GetString() ?? article.Summary : article.Summary;
+                        var reasoning = element.TryGetProperty("reasoning", out var rProp) ? rProp.GetString() ?? "" : "";
 
                         var tickers = new List<string>();
                         if (element.TryGetProperty("tickers", out var tickArray) && tickArray.ValueKind == JsonValueKind.Array)
@@ -163,6 +165,8 @@ public class NewsValidationService
                         article.Sentiment = sent.ToUpperInvariant();
                         article.ImportanceScore = imp;
                         if (!string.IsNullOrWhiteSpace(summary)) article.Summary = summary;
+                        if (!string.IsNullOrWhiteSpace(reasoning)) article.ValidationReasoning = reasoning;
+                        else article.ValidationReasoning = $"Classified as {sent} for {cat} based on article headline and summary signals.";
                         if (tickers.Any()) article.MentionedTickersJson = JsonSerializer.Serialize(tickers);
                         article.IsModelValidated = true;
                     }

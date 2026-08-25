@@ -16,6 +16,7 @@ public class NewsArticle
     public string MentionedTickersJson { get; set; } = "[]"; // JSON array string e.g. ["COMB.N0000", "BTCUSDT"]
     public bool IsModelValidated { get; set; } = false;
     public bool IsRelevant { get; set; } = true;
+    public string ValidationReasoning { get; set; } = string.Empty; // AI model explanation for relevance/sentiment decision
     public DateTime PublishedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
