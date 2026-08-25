@@ -78,6 +78,25 @@ public class NewsApiController : ControllerBase
         return Ok(articles);
     }
 
+    [HttpGet("status")]
+    public async Task<IActionResult> GetNewsStatus()
+    {
+        var totalArticles = await _dbContext.NewsArticles.CountAsync();
+        var pendingValidation = await _dbContext.NewsArticles.CountAsync(n => !n.IsModelValidated);
+        var validatedCount = await _dbContext.NewsArticles.CountAsync(n => n.IsModelValidated);
+        var relevantCount = await _dbContext.NewsArticles.CountAsync(n => n.IsModelValidated && n.IsRelevant);
+
+        return Ok(new
+        {
+            totalArticles,
+            pendingValidation,
+            validatedCount,
+            relevantCount,
+            isScanning = pendingValidation > 0,
+            timestamp = DateTime.UtcNow
+        });
+    }
+
     [HttpPost("sync")]
     public async Task<IActionResult> SyncNews()
     {
