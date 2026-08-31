@@ -19,7 +19,7 @@ The application consists of two main parts:
 
 ### Controllers/Endpoints
 Located in `Controllers/Api`:
-- `AlertApiController`, `AlgorithmsApiController`, `AuthApiController`, `CryptoApiController`, `PortfolioApiController`, `ProfileApiController`, `SettingsApiController`, `StockApiController`, `WatchlistApiController`.
+- `AlertApiController`, `AlgorithmsApiController`, `AuthApiController`, `CryptoApiController`, `DividendsApiController`, `NewsApiController`, `PortfolioApiController`, `ProfileApiController`, `SettingsApiController`, `StockApiController`, `WatchlistApiController`.
 Other:
 - `BinanceController`, `TelegramController`.
 
@@ -29,8 +29,11 @@ Located in `Application/Services`:
 - `AlertService`
 - `BinanceService`
 - `CryptoMarketService`
+- `CseDividendFetcherService`
 - `PdfSyncService`
 - `PortfolioService`
+- `NewsIngestionService`
+- `NewsValidationService`
 - `StockService`
 - `TelegramService`
 - `TokenService`
@@ -39,11 +42,15 @@ Located in `Application/Services`:
 
 ### Background Workers
 Located in `Jobs`:
-- (Will identify background workers in Phase 1 Task 1)
+- `AlertJob`
+- `CseDividendJob`
+- `ExchangeRateJob`
+- `NewsIngestionJob`
+- `NewsValidationJob`
 
 ### Database Entities
 Located in `Domain/Entities`:
-- `Alert`, `ApplicationUser`, `CurrencyExchangeRate`, `Portfolio`, `PortfolioHolding`, `Profile`, `WatchlistItem`
+- `Alert`, `ApplicationUser`, `CurrencyExchangeRate`, `Dividend`, `NewsArticle`, `OtpRecord`, `Portfolio`, `PortfolioHolding`, `Profile`, `WatchlistItem`
 
 ### Repositories
 Located in `Infrastructure/Repositories`:
@@ -51,6 +58,7 @@ Located in `Infrastructure/Repositories`:
 
 ### External Integrations
 - **Binance API**: WebSockets via `BinanceService`
-- **CSE API**: Stock data via `StockService`
+- **CSE API**: Stock data via `StockService`; dividend announcements via `CseDividendJob` / `CseDividendFetcherService`
 - **Telegram API**: Notifications via `TelegramService`
 - **Google OAuth**: Auth handled by `AuthApiController` and `TokenService`
+- **Ollama API**: Local model validation for news relevance/sentiment in `NewsValidationService`

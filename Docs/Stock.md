@@ -5,6 +5,7 @@ This document provides a comprehensive overview of all stock-related features, s
 ## Overview
 The stock module is responsible for:
 - Fetching and updating stock data from the CSE API
+- Fetching and storing CSE dividend announcements
 - Managing stock entities in the database
 - Providing APIs for stock data retrieval
 - Supporting alerting and notification features based on stock prices
@@ -12,11 +13,16 @@ The stock module is responsible for:
 ## Data Flow
 1. **StockService** fetches data from the CSE API and updates the database.
 2. **StockController** exposes endpoints for retrieving stock data.
-3. **AlertService** uses stock data to trigger alerts.
+3. **CseDividendJob** fetches CSE dividend announcements and upserts `Dividends`.
+4. **NewsApiController** enriches news responses with `dividendPaymentDate` when available.
+5. **AlertService** uses stock data to trigger alerts.
 
 ## Key Classes & Files
 - **Application/Services/StockService.cs**: Core logic for fetching, updating, and caching stock data.
 - **Controllers/StockController.cs**: API endpoints for stock data.
+- **Jobs/CseDividendJob.cs**: Scheduled CSE dividend ingestion worker.
+- **Controllers/Api/DividendsApiController.cs**: Dividend history API per symbol.
+- **Controllers/Api/NewsApiController.cs**: Stock news APIs with dividend payment date metadata.
 - **Application/Dtos/StockDataDtos.cs**: Data transfer objects for stock API responses.
 - **Models/Stocks.cs**: Entity model for stocks in the database.
 
@@ -25,6 +31,8 @@ The stock module is responsible for:
 - **Get Stock Data**: `GetStockDataAsync(symbol)` fetches and updates stock data for a given symbol.
 - **Trading Summary**: `GetTradingSummaryAsync()` fetches and updates trading summary data for all stocks.
 - **Alert Integration**: Alerts can be set based on stock price changes.
+- **Dividend History by Symbol**: `/api/dividends/symbol/{symbol}` returns recent dividend records.
+- **Payment-Date-Focused News**: stock news endpoints surface dividend payment dates for UI prioritization.
 
 ## Example Usage
 - The `StockController` exposes an endpoint `/api/stock/{symbol}` to get stock data.
@@ -68,6 +76,7 @@ Response:
 ## Related Features
 - Alerts based on stock price
 - Stock search and dashboard
+- Dividend panel in stock detail view
 - Integration with Telegram notifications
 
 ---

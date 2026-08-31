@@ -36,6 +36,8 @@ The goals of this project are:
   - Watchlist and Portfolio tracking
   - Interactive charts using Recharts and Lightweight Charts
   - Settings and User Profile pages
+  - Individual stock detail view with a dividend snapshot panel
+  - CSE news view with dividend-payment-date emphasis
 
 - **User Authentication**
   - Google OAuth Integration for the frontend
@@ -45,6 +47,16 @@ The goals of this project are:
 - **Stock & Crypto Data Integration**
   - Connected to **CSE API** for live stock prices
   - Connected to **Binance WebSocket API** for real-time crypto updates
+
+- **Dividend Ingestion & Storage (CSE)**
+  - Background worker fetches approved dividend announcements from CSE
+  - Saves dividend records into `Dividends` table
+  - Auto-generates linked dividend news entries in `NewsArticles`
+
+- **Market News Pipeline**
+  - Multi-provider ingestion and model validation flow
+  - Symbol-specific news feed support for stock detail pages
+  - Dividend payment date surfaced in API responses for UI prioritization
 
 - **Algorithmic Trading & Alerts**
   - Base logic for BTC trading algorithms
@@ -57,6 +69,11 @@ The goals of this project are:
 - **Backend & Logging**
   - .NET 9 MVC / Web API architecture
   - Serilog implemented with automatic daily log files
+  - Hosted jobs for alerts, exchange-rate sync, news ingestion/validation, and CSE dividends
+
+- **Recent API Additions**
+  - `GET /api/dividends/symbol/{symbol}`: dividend records per stock symbol
+  - `GET /api/news` and `GET /api/news/symbol/{symbol}` now include dividend payment date metadata when available
 
 ---
 
@@ -77,6 +94,10 @@ The goals of this project are:
 - **Historical Data & Analytics**
   - Aggregate historical data for better charting in the dashboard.
   - Set up automated daily MySQL backups.
+
+- **Dividend UX Enhancements**
+  - Add upcoming dividend payment countdown and calendar export support.
+  - Add richer parsing/normalization for CSE payment date formats.
 
 - **DevOps & Testing**
   - Write Unit & Integration tests for critical API routes.

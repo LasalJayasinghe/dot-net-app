@@ -7,6 +7,10 @@
 | Portfolio | Existing | Multi-portfolio support for Stocks/Crypto, PDF Sync |
 | Watchlist | Existing | Watchlist items per user |
 | CSE market data | Existing | StockService integration |
+| CSE dividend ingestion | Existing | `CseDividendJob` fetches announcements and upserts `Dividends` |
+| Dividend API | Existing | `GET /api/dividends/symbol/{symbol}` returns dividend history per stock |
+| Stock detail dividend panel | Existing | Dashboard stock detail view renders dividend snapshot and table |
+| Dividend payment date in news | Existing | News endpoints include `dividendPaymentDate`; CSE news prioritizes payment-date items |
 | Binance WebSocket | Existing | BinanceService integration |
 | Alerts | Existing | Alert configuration and background processing (`AlertJob.cs`) |
 | Telegram | Existing | TelegramService sends alerts |
