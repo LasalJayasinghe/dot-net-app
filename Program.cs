@@ -126,6 +126,7 @@ builder.Services.AddHttpClient("binance", client =>
 
 builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
 builder.Services.AddHostedService<AlertJob>();
+builder.Services.AddHostedService<CseDividendJob>();
 
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
 

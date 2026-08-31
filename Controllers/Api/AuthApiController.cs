@@ -96,7 +96,7 @@ public class AuthController : ControllerBase
 
         // Check if user exists
         var user = await _userManager.FindByEmailAsync(payload.Email);
-        Profile profile = null;
+        Profile? profile;
 
         if (user == null)
         {

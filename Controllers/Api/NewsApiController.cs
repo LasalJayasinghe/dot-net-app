@@ -53,12 +53,38 @@ public class NewsApiController : ControllerBase
             .Take(limit)
             .ToListAsync();
 
+        var paymentDatesByExternalId = await _dbContext.Dividends
+            .AsNoTracking()
+            .ToDictionaryAsync(d => $"cse-dividend-{d.Id}", d => d.PaymentDate);
+
+        var items = articles.Select(a => new
+        {
+            a.Id,
+            a.ExternalId,
+            a.Title,
+            a.Summary,
+            a.OriginalUrl,
+            a.Source,
+            a.MarketCategory,
+            a.Sentiment,
+            a.ImportanceScore,
+            a.MentionedTickersJson,
+            a.IsModelValidated,
+            a.IsRelevant,
+            a.ValidationReasoning,
+            a.PublishedAt,
+            a.CreatedAt,
+            DividendPaymentDate = paymentDatesByExternalId.TryGetValue(a.ExternalId, out var paymentDate)
+                ? paymentDate
+                : null
+        });
+
         return Ok(new
         {
             totalItems,
             page,
             limit,
-            items = articles
+            items
         });
     }
 
@@ -75,7 +101,33 @@ public class NewsApiController : ControllerBase
             .Take(limit)
             .ToListAsync();
 
-        return Ok(articles);
+        var paymentDatesByExternalId = await _dbContext.Dividends
+            .AsNoTracking()
+            .ToDictionaryAsync(d => $"cse-dividend-{d.Id}", d => d.PaymentDate);
+
+        var items = articles.Select(a => new
+        {
+            a.Id,
+            a.ExternalId,
+            a.Title,
+            a.Summary,
+            a.OriginalUrl,
+            a.Source,
+            a.MarketCategory,
+            a.Sentiment,
+            a.ImportanceScore,
+            a.MentionedTickersJson,
+            a.IsModelValidated,
+            a.IsRelevant,
+            a.ValidationReasoning,
+            a.PublishedAt,
+            a.CreatedAt,
+            DividendPaymentDate = paymentDatesByExternalId.TryGetValue(a.ExternalId, out var paymentDate)
+                ? paymentDate
+                : null
+        });
+
+        return Ok(items);
     }
 
     [HttpGet("status")]

@@ -565,6 +565,59 @@ namespace dotnetApp.Migrations
                     b.ToTable("WatchlistItems", (string)null);
                 });
 
+            modelBuilder.Entity("dotnetApp.Domain.Entities.Dividend", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AgmDate")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("DateOfAnnouncement")
+                        .HasColumnType("datetime");
+
+                    b.Property<string>("FinancialYear")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<decimal>("NonVotingDivPerShare")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<string>("PaymentDate")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("RecordDate")
+                        .HasColumnType("datetime");
+
+                    b.Property<string>("Remarks")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<decimal>("VotingDivPerShare")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Dividends", (string)null);
+                });
+
             modelBuilder.Entity("dotnetApp.Domain.Entities.NewsArticle", b =>
                 {
                     b.Property<int>("Id")
@@ -624,6 +677,10 @@ namespace dotnetApp.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
+
+                    b.Property<string>("ValidationReasoning")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.HasKey("Id");
 

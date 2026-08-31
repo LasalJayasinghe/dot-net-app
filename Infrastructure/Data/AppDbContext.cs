@@ -20,6 +20,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<CurrencyExchangeRate> CurrencyExchangeRates { get; set; } = null!;
     public DbSet<OtpRecord> OtpRecords { get; set; } = null!;
     public DbSet<NewsArticle> NewsArticles { get; set; } = null!;
+    public DbSet<Dividend> Dividends { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -181,6 +182,22 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(n => n.PublishedAt);
             entity.HasIndex(n => n.IsModelValidated);
             entity.HasIndex(n => n.IsRelevant);
+        });
+
+        // ── Dividend ────────────────────────────────────────────────────────
+        builder.Entity<Dividend>(entity =>
+        {
+            entity.ToTable("Dividends");
+            entity.HasKey(d => d.Id);
+            entity.Property(d => d.Symbol).IsRequired().HasMaxLength(20);
+            entity.Property(d => d.CompanyName).IsRequired().HasMaxLength(200);
+            entity.Property(d => d.DateOfAnnouncement).HasColumnType("datetime");
+            entity.Property(d => d.VotingDivPerShare).HasColumnType("decimal(28,8)");
+            entity.Property(d => d.NonVotingDivPerShare).HasColumnType("decimal(28,8)");
+            entity.Property(d => d.FinancialYear).HasMaxLength(50);
+            entity.Property(d => d.RecordDate).HasColumnType("datetime");
+            entity.Property(d => d.PaymentDate).HasMaxLength(100);
+            entity.Property(d => d.AgmDate).HasMaxLength(100);
         });
     }
 }
