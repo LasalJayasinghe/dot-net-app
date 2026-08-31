@@ -27,7 +27,7 @@ public class AlertJob : BackgroundService
                 await stockService.GetSnpData();
                 await alertService.MonitorAlertsAsync(stoppingToken);
 
-                await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
 
             }
             catch (Exception ex)

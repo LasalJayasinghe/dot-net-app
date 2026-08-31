@@ -106,8 +106,8 @@ public class StockApiController : ControllerBase
     [HttpGet("indices")]
     public async Task<IActionResult> GetIndices()
     {
-        var aspi = await _stockService.GetASPIData();
-        var snp = await _stockService.GetSnpData();
+        var aspi = await _stockService.GetSavedAspiDataAsync();
+        var snp = await _stockService.GetSavedSnpDataAsync();
         return Ok(new { aspi, snp });
     }
 }

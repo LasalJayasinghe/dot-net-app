@@ -336,4 +336,34 @@ public class StockService
     {
         return await _stockRepository.GetMarketStatusAsync();
     }
+
+    public async Task<StockIndicesDto> GetSavedAspiDataAsync()
+    {
+        var entity = await _stockRepository.GetMarketIndexAsync(global::MarketIndexType.ASPI);
+        return ToStockIndicesDto(entity, dotnetApp.Application.Dtos.MarketIndexType.ASPI);
+    }
+
+    public async Task<StockIndicesDto> GetSavedSnpDataAsync()
+    {
+        var entity = await _stockRepository.GetMarketIndexAsync(global::MarketIndexType.SNP);
+        return ToStockIndicesDto(entity, dotnetApp.Application.Dtos.MarketIndexType.SNP);
+    }
+
+    private static StockIndicesDto ToStockIndicesDto(MarketIndices? entity, dotnetApp.Application.Dtos.MarketIndexType fallbackType)
+    {
+        if (entity == null)
+        {
+            return new StockIndicesDto { IndexType = fallbackType };
+        }
+
+        return new StockIndicesDto
+        {
+            IndexType = (dotnetApp.Application.Dtos.MarketIndexType)(int)entity.IndexType,
+            value = entity.Value,
+            highValue = entity.HighValue,
+            lowValue = entity.LowValue,
+            change = entity.Change,
+            percentage = entity.Percentage
+        };
+    }
 }
