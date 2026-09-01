@@ -23,17 +23,35 @@ public class AlertApiController : ControllerBase
         _dbContext = dbContext;
     }
 
-    private static object ToDto(Alert alert)
+    private static object ToDto(Alert alert, decimal? currentPrice = null)
     {
         return new
         {
             id = alert.Id,
             symbol = alert.Symbol,
             targetPrice = alert.TargetPrice,
+            currentPrice,
             isAbove = alert.IsAbove,
             isActive = alert.IsActive,
             createdAt = alert.CreatedAt
         };
+    }
+
+    private async Task<Dictionary<string, decimal>> GetCurrentPricesAsync(IEnumerable<string> symbols)
+    {
+        var distinct = symbols.Distinct().ToList();
+        if (distinct.Count == 0) return new Dictionary<string, decimal>();
+
+        return await _dbContext.Stocks
+            .AsNoTracking()
+            .Where(s => distinct.Contains(s.Symbol))
+            .ToDictionaryAsync(s => s.Symbol, s => s.Price);
+    }
+
+    private async Task<decimal?> GetCurrentPriceAsync(string symbol)
+    {
+        var prices = await GetCurrentPricesAsync(new[] { symbol });
+        return prices.TryGetValue(symbol, out var price) ? price : null;
     }
 
     [HttpGet]
@@ -48,7 +66,10 @@ public class AlertApiController : ControllerBase
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
 
-        return Ok(alerts.Select(ToDto));
+        var prices = await GetCurrentPricesAsync(alerts.Select(a => a.Symbol));
+
+        return Ok(alerts.Select(a =>
+            ToDto(a, prices.TryGetValue(a.Symbol, out var price) ? price : null)));
     }
 
     [HttpPost]
@@ -74,7 +95,7 @@ public class AlertApiController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = alert.Id },
-            ToDto(alert)
+            ToDto(alert, await GetCurrentPriceAsync(alert.Symbol))
         );
     }
 
@@ -97,7 +118,7 @@ public class AlertApiController : ControllerBase
 
         await _dbContext.SaveChangesAsync();
 
-        return Ok(ToDto(alert));
+        return Ok(ToDto(alert, await GetCurrentPriceAsync(alert.Symbol)));
     }
 
     [HttpDelete("{id:int}")]
@@ -132,6 +153,6 @@ public class AlertApiController : ControllerBase
         if (alert == null)
             return NotFound();
 
-        return Ok(ToDto(alert));
+        return Ok(ToDto(alert, await GetCurrentPriceAsync(alert.Symbol)));
     }
 }
