@@ -8,6 +8,9 @@ using dotnetApp.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using dotnetApp.Application.Interface;
 using dotnetApp.Application.Services;
 using dotnetApp.Application.Services.NewsProviders;
@@ -80,6 +83,10 @@ builder.Services.AddSingleton<TradingBotService>();
 builder.Services.AddScoped<ICryptoMarketService, CryptoMarketService>();
 builder.Services.AddScoped<IAiMarketSummaryService, AiMarketSummaryService>();
 builder.Services.AddScoped<dotnetApp.Application.Services.PortfolioService>();
+
+// Hourly portfolio value snapshots (powers the portfolio-value-over-time graph)
+builder.Services.AddScoped<dotnetApp.Application.Services.PortfolioSnapshotService>();
+builder.Services.AddHostedService<PortfolioSnapshotJob>();
 
 // AI Chat Integration
 builder.Services.AddHttpClient<AiAgentService>(client =>
@@ -157,6 +164,23 @@ builder.Services.AddAuthorization(options =>
 //     options.AccessDeniedPath = "/Home/AccessDenied";
 // });
 
+// The signing key is required. Falling back to a literal baked into the source would mean a
+// misconfigured environment silently signs and validates tokens with a publicly known key,
+// letting anyone forge a token for any user - so fail fast at startup instead.
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    throw new InvalidOperationException(
+        "Jwt:Key is not configured. Set it via user-secrets (dotnet user-secrets set \"Jwt:Key\" \"<key>\") " +
+        "or the Jwt__Key environment variable.");
+}
+
+if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
+{
+    throw new InvalidOperationException(
+        "Jwt:Key must be at least 32 bytes to sign HMAC-SHA256 tokens.");
+}
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -175,7 +199,7 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? "SuperSecretDefaultKeyForDevPurposes12345!")
+            Encoding.UTF8.GetBytes(jwtKey)
         ),
 
         ClockSkew = TimeSpan.Zero
@@ -193,11 +217,54 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// Every endpoint was previously unthrottled, so a single caller could hammer database-backed
+// routes (or the paid third-party ingestion routes) without limit. Partitioned per
+// authenticated user, falling back to remote IP for anonymous callers.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        var partitionKey =
+            context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 300,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+});
+
+const string CorsPolicyName = "FrontendOrigins";
+
+// Reflecting any origin while also allowing credentials defeats the browser rule that forbids
+// "*" together with credentials: it lets any site on the internet make credentialed
+// cross-origin calls to this API. Origins are allowlisted from configuration instead.
+var allowedOrigins = (builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>() ?? Array.Empty<string>())
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.Trim().TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
+if (allowedOrigins.Length == 0)
+{
+    throw new InvalidOperationException(
+        "Cors:AllowedOrigins is not configured. List the exact front-end origins allowed to call " +
+        "this API, e.g. \"Cors\": { \"AllowedOrigins\": [ \"http://localhost:3000\" ] }.");
+}
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy(CorsPolicyName, policy =>
     {
-        policy.SetIsOriginAllowed(origin => true) // allows any origin
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials(); // required for SignalR cross-origin
@@ -250,8 +317,11 @@ using (var scope = app.Services.CreateScope())
 
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseCors("AllowAll");
+app.UseCors(CorsPolicyName);
 app.UseAuthentication();
+// Runs after authentication so limits can be partitioned per user, but before authorization so
+// that unauthenticated floods are throttled too rather than short-circuiting on a 401.
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
 app.Map("/error", () => Results.Problem());

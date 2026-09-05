@@ -17,6 +17,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<WatchlistItem> WatchlistItems { get; set; } = null!;
     public DbSet<Portfolio> Portfolios { get; set; } = null!;
     public DbSet<PortfolioHolding> PortfolioHoldings { get; set; } = null!;
+    public DbSet<PortfolioSnapshot> PortfolioSnapshots { get; set; } = null!;
     public DbSet<CurrencyExchangeRate> CurrencyExchangeRates { get; set; } = null!;
     public DbSet<OtpRecord> OtpRecords { get; set; } = null!;
     public DbSet<NewsArticle> NewsArticles { get; set; } = null!;
@@ -154,6 +155,38 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // ── PortfolioSnapshot ──────────────────────────────────────────────────
+        builder.Entity<PortfolioSnapshot>(entity =>
+        {
+            entity.ToTable("PortfolioSnapshots");
+            entity.HasKey(s => s.Id);
+
+            entity.Property(s => s.UserId).IsRequired().HasMaxLength(255);
+            entity.Property(s => s.CapturedAt).HasColumnType("datetime(6)");
+            entity.Property(s => s.TotalValueLkr).HasColumnType("decimal(28,8)");
+            entity.Property(s => s.TotalValueUsdt).HasColumnType("decimal(28,8)");
+            entity.Property(s => s.TotalProfitLossLkr).HasColumnType("decimal(28,8)");
+            entity.Property(s => s.TotalProfitLossUsdt).HasColumnType("decimal(28,8)");
+            entity.Property(s => s.UsdtToLkrRate).HasColumnType("decimal(18,6)");
+            entity.Property(s => s.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+            // The graph reads a time window for one user (and optionally one portfolio).
+            entity.HasIndex(s => new { s.UserId, s.CapturedAt });
+            entity.HasIndex(s => new { s.PortfolioId, s.CapturedAt });
+
+            entity.HasOne(s => s.User)
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Deleting a portfolio drops its own history but leaves the
+            // aggregate net-worth series (PortfolioId == null) intact.
+            entity.HasOne(s => s.Portfolio)
+                .WithMany()
+                .HasForeignKey(s => s.PortfolioId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // ── CurrencyExchangeRate ───────────────────────────────────────────────
         builder.Entity<CurrencyExchangeRate>(entity =>
         {
@@ -190,14 +223,27 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             entity.ToTable("Dividends");
             entity.HasKey(d => d.Id);
             entity.Property(d => d.Symbol).IsRequired().HasMaxLength(20);
+            entity.Property(d => d.BaseSymbol).IsRequired().HasMaxLength(20);
             entity.Property(d => d.CompanyName).IsRequired().HasMaxLength(200);
             entity.Property(d => d.DateOfAnnouncement).HasColumnType("datetime");
             entity.Property(d => d.VotingDivPerShare).HasColumnType("decimal(28,8)");
             entity.Property(d => d.NonVotingDivPerShare).HasColumnType("decimal(28,8)");
             entity.Property(d => d.FinancialYear).HasMaxLength(50);
             entity.Property(d => d.RecordDate).HasColumnType("datetime");
-            entity.Property(d => d.PaymentDate).HasMaxLength(100);
-            entity.Property(d => d.AgmDate).HasMaxLength(100);
+            entity.Property(d => d.PaymentDate).HasColumnType("datetime");
+            entity.Property(d => d.AgmDate).HasColumnType("datetime");
+            entity.Property(d => d.PaymentDateRaw).HasMaxLength(100);
+            entity.Property(d => d.AgmDateRaw).HasMaxLength(100);
+
+            // Upsert key for the CSE ingestion job.
+            entity.HasIndex(d => d.CseAnnouncementId).IsUnique();
+
+            // Serves the "upcoming dividends" query (filter + order on RecordDate).
+            entity.HasIndex(d => d.RecordDate);
+
+            // Serves per-symbol history: equality on BaseSymbol, ordered by RecordDate.
+            entity.HasIndex(d => new { d.BaseSymbol, d.RecordDate });
         });
+
     }
 }

@@ -96,3 +96,28 @@ public class NetWorthOverviewDto
     public decimal LkrToUsdtRate { get; set; }
     public List<PortfolioSummaryDto> Portfolios { get; set; } = new();
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Snapshot history (portfolio value over time)
+// ─────────────────────────────────────────────────────────────────────────────
+
+public class PortfolioHistoryPointDto
+{
+    public DateTime CapturedAt { get; set; }          // UTC, top of the hour
+    public decimal ValueLkr { get; set; }
+    public decimal ValueUsdt { get; set; }
+    public decimal ProfitLossLkr { get; set; }
+    public decimal ProfitLossUsdt { get; set; }
+}
+
+public class PortfolioHistoryDto
+{
+    public string Range { get; set; } = "1M";         // 1D, 1W, 1M, 3M, 1Y, ALL
+    public int? PortfolioId { get; set; }             // null = aggregated net worth
+    public string Interval { get; set; } = "hour";    // "hour" or "day" (down-sampled)
+    public decimal StartValueLkr { get; set; }
+    public decimal EndValueLkr { get; set; }
+    public decimal ChangeLkr { get; set; }
+    public decimal ChangePercent { get; set; }
+    public List<PortfolioHistoryPointDto> Points { get; set; } = new();
+}

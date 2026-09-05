@@ -11,17 +11,23 @@ using Microsoft.EntityFrameworkCore;
 
 namespace dotnetApp.Controllers.Api;
 
+[Authorize]
 [ApiController]
 [Route("api/news")]
 public class NewsApiController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
     private readonly NewsIngestionService _newsIngestionService;
+    private readonly ILogger<NewsApiController> _logger;
 
-    public NewsApiController(AppDbContext dbContext, NewsIngestionService newsIngestionService)
+    public NewsApiController(
+        AppDbContext dbContext,
+        NewsIngestionService newsIngestionService,
+        ILogger<NewsApiController> logger)
     {
         _dbContext = dbContext;
         _newsIngestionService = newsIngestionService;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -159,7 +165,10 @@ public class NewsApiController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = ex.Message });
+            // The exception text can carry connection strings and provider internals, so it is
+            // logged server-side and never returned to the caller.
+            _logger.LogError(ex, "News ingestion failed.");
+            return StatusCode(500, new { error = "News ingestion failed. See server logs for details." });
         }
     }
 }

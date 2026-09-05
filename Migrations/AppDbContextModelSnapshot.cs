@@ -450,6 +450,57 @@ namespace dotnetApp.Migrations
                     b.ToTable("PortfolioHoldings", (string)null);
                 });
 
+            modelBuilder.Entity("PortfolioSnapshot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CapturedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+                    b.Property<int>("HoldingCount")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PortfolioId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalProfitLossLkr")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<decimal>("TotalProfitLossUsdt")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<decimal>("TotalValueLkr")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<decimal>("TotalValueUsdt")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<decimal>("UsdtToLkrRate")
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PortfolioId", "CapturedAt");
+
+                    b.HasIndex("UserId", "CapturedAt");
+
+                    b.ToTable("PortfolioSnapshots", (string)null);
+                });
+
             modelBuilder.Entity("Profile", b =>
                 {
                     b.Property<int>("Id")
@@ -573,9 +624,17 @@ namespace dotnetApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AgmDate")
+                    b.Property<DateTime?>("AgmDate")
+                        .HasColumnType("datetime");
+
+                    b.Property<string>("AgmDateRaw")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
+
+                    b.Property<string>("BaseSymbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
 
                     b.Property<string>("CompanyName")
                         .IsRequired()
@@ -584,6 +643,9 @@ namespace dotnetApp.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<int>("CseAnnouncementId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("DateOfAnnouncement")
                         .HasColumnType("datetime");
@@ -595,7 +657,10 @@ namespace dotnetApp.Migrations
                     b.Property<decimal>("NonVotingDivPerShare")
                         .HasColumnType("decimal(28,8)");
 
-                    b.Property<string>("PaymentDate")
+                    b.Property<DateTime?>("PaymentDate")
+                        .HasColumnType("datetime");
+
+                    b.Property<string>("PaymentDateRaw")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
@@ -614,6 +679,13 @@ namespace dotnetApp.Migrations
                         .HasColumnType("decimal(28,8)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CseAnnouncementId")
+                        .IsUnique();
+
+                    b.HasIndex("RecordDate");
+
+                    b.HasIndex("BaseSymbol", "RecordDate");
 
                     b.ToTable("Dividends", (string)null);
                 });
@@ -808,6 +880,24 @@ namespace dotnetApp.Migrations
                         .IsRequired();
 
                     b.Navigation("Portfolio");
+                });
+
+            modelBuilder.Entity("PortfolioSnapshot", b =>
+                {
+                    b.HasOne("Portfolio", "Portfolio")
+                        .WithMany()
+                        .HasForeignKey("PortfolioId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Portfolio");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Profile", b =>

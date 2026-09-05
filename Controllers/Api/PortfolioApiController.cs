@@ -19,6 +19,7 @@ namespace dotnetApp.Controllers.Api;
 ///   POST   /api/portfolios/{id}/holdings         — Add or update a holding (weighted average for re-buys)
 ///   DELETE /api/portfolios/{id}/holdings/{hId}   — Remove a specific holding
 ///   GET    /api/portfolios/net-worth             — Aggregated net worth across all portfolios in display currency
+///   GET    /api/portfolios/history               — Hourly value-over-time series (net worth, or one portfolio)
 ///   POST   /api/portfolios/{id}/sync-pdf         — Sync portfolio holdings from PDF
 /// </summary>
 [ApiController]
@@ -30,17 +31,20 @@ public class PortfolioApiController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<PortfolioApiController> _logger;
     private readonly IPortfolioFileSyncService _fileSyncService;
+    private readonly PortfolioSnapshotService _snapshotService;
 
     public PortfolioApiController(
         PortfolioService portfolioService,
         UserManager<ApplicationUser> userManager,
         ILogger<PortfolioApiController> logger,
-        IPortfolioFileSyncService fileSyncService)
+        IPortfolioFileSyncService fileSyncService,
+        PortfolioSnapshotService snapshotService)
     {
         _portfolioService = portfolioService;
         _userManager      = userManager;
         _logger           = logger;
         _fileSyncService   = fileSyncService;
+        _snapshotService  = snapshotService;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -77,6 +81,31 @@ public class PortfolioApiController : ControllerBase
 
         var data = await _portfolioService.GetNetWorthAsync(userId);
         return Ok(data);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/portfolios/history
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Portfolio value over time, from the hourly snapshots written by PortfolioSnapshotJob.
+    /// </summary>
+    /// <param name="range">1D, 1W, 1M (default), 3M, 1Y or ALL. 3M and longer are down-sampled to daily points.</param>
+    /// <param name="portfolioId">Omit for aggregated net worth; supply an id for a single portfolio.</param>
+    [HttpGet("history")]
+    public async Task<IActionResult> GetHistory(
+        [FromQuery] string range = "1M",
+        [FromQuery] int? portfolioId = null,
+        CancellationToken ct = default)
+    {
+        var userId = _userManager.GetUserId(User);
+        if (userId == null) return Unauthorized();
+
+        if (portfolioId.HasValue && !await _portfolioService.OwnsPortfolioAsync(userId, portfolioId.Value))
+            return NotFound(new { message = "Portfolio not found." });
+
+        var history = await _snapshotService.GetHistoryAsync(userId, portfolioId, range, ct);
+        return Ok(history);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -104,6 +104,10 @@ public class PortfolioService
         return ToDetailDto(portfolio, holdingDtos, totalValue, totalCost, pnl, pnlPercent);
     }
 
+    /// <summary>Cheap ownership check — no pricing, no holdings load.</summary>
+    public Task<bool> OwnsPortfolioAsync(string userId, int portfolioId)
+        => _db.Portfolios.AsNoTracking().AnyAsync(p => p.Id == portfolioId && p.UserId == userId);
+
     public async Task<bool> UpdatePortfolioAsync(string userId, int portfolioId, UpdatePortfolioRequest req)
     {
         var portfolio = await _db.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId && p.UserId == userId);
