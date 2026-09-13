@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 
@@ -10,7 +10,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
     public DbSet<Alert> Alerts { get; set; } = null!;
-    public DbSet<Stocks> Stocks { get; set; } = null!;
+    public DbSet<Stock> Stocks { get; set; } = null!;
     public DbSet<MarketStatus> MarketStatus { get; set; } = null!;
     public DbSet<MarketIndices> MarketIndices { get; set; } = null!;
     public DbSet<Profile> Profiles { get; set; } = null!;
@@ -55,13 +55,13 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(u => u.NormalizedEmail).HasMaxLength(191);
         });
 
-        builder.Entity<Stocks>()
+        builder.Entity<Stock>()
             .HasIndex(s => s.Symbol)
             .IsUnique();
 
         builder.Entity<MarketStatus>(entity =>
         {
-            entity.ToTable("cse_MarketStatus");
+            entity.ToTable("CseMarketStatus");
 
             entity.HasKey(e => e.Id);
 
@@ -71,7 +71,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<MarketIndices>(entity =>
         {
-            entity.ToTable("cse_MarketIndices");
+            entity.ToTable("CseMarketIndices");
         });
 
         builder.Entity<MarketIndices>()
@@ -86,7 +86,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<Profile>(entity =>
         {
-            entity.ToTable("profile");
+            entity.ToTable("Profiles");
             entity.HasIndex(p => p.UserId);
         });
 

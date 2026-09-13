@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace dotnetApp.Application.ViewModels.Alerts;
 
@@ -18,7 +18,7 @@ public class AlertCreateViewModel
     [Display(Name = "Is Active?")]
     public bool IsActive { get; set; } = true;
 
-    public List<Stocks> StockNames { get; set; } = new();
+    public List<Stock> StockNames { get; set; } = new();
 
 }
 
@@ -36,12 +36,12 @@ public class AlertEditViewModel
     [Display(Name = "Is Active?")]
     public bool IsActive { get; set; } = true;
 
-    public List<Stocks> StockNames { get; set; } = new();
+    public List<Stock> StockNames { get; set; } = new();
 
 }
 
 public class AlertsListViewModel
 {
     public List<Alert> Alerts { get; set; } = new();
-    public List<Stocks> StockNames { get; set; } = new();
+    public List<Stock> StockNames { get; set; } = new();
 }

@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-public class Stocks
+public class Stock
 {
     [Key]
     public int Id { get; set; } // Internal DB ID (never from API)

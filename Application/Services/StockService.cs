@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using dotnetApp.Application.Dtos;
 using dotnetApp.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -121,7 +121,7 @@ public class StockService
                     else
                     {
                         // Insert new stock
-                        await _stockRepository.AddAsync(new Stocks
+                        await _stockRepository.AddAsync(new Stock
                         {
                             Symbol = item.Symbol,
                             Name = item.Name,
@@ -153,7 +153,7 @@ public class StockService
     }
 
 
-    public async Task<List<Stocks>> GetAllStockNamesAsync()
+    public async Task<List<Stock>> GetAllStockNamesAsync()
     {
         const string cacheKey = "AllStockNames";
 
@@ -163,10 +163,10 @@ public class StockService
             return await _stockRepository.GetAllStockNamesAsync();
         });
 
-        return result ?? new List<Stocks>();
+        return result ?? new List<Stock>();
     }
 
-    public async Task<List<Stocks>> GetStockTickersAsync()
+    public async Task<List<Stock>> GetStockTickersAsync()
     {
         return await _stockRepository.GetStockTickersAsync();
     }

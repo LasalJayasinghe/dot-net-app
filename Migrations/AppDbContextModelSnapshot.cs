@@ -197,7 +197,7 @@ namespace dotnetApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("cse_MarketIndices", (string)null);
+                    b.ToTable("CseMarketIndices", (string)null);
                 });
 
             modelBuilder.Entity("MarketStatus", b =>
@@ -225,7 +225,7 @@ namespace dotnetApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("cse_MarketStatus", (string)null);
+                    b.ToTable("CseMarketStatus", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -535,10 +535,10 @@ namespace dotnetApp.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("profile", (string)null);
+                    b.ToTable("Profiles", (string)null);
                 });
 
-            modelBuilder.Entity("Stocks", b =>
+            modelBuilder.Entity("Stock", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()

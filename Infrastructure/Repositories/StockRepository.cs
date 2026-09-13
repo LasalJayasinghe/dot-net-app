@@ -1,4 +1,4 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using dotnetApp.Application.Dtos;
 using dotnetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -13,17 +13,17 @@ public class StockRepository
 
     #region Stocks
 
-    public Task<Stocks?> GetBySymbolAsync(string symbol)
+    public Task<Stock?> GetBySymbolAsync(string symbol)
         => _db.Stocks.FirstOrDefaultAsync(s => s.Symbol == symbol);
 
-    public Task<List<Stocks>> GetBySymbolsAsync(IEnumerable<string> symbols)
+    public Task<List<Stock>> GetBySymbolsAsync(IEnumerable<string> symbols)
         => _db.Stocks.Where(s => symbols.Contains(s.Symbol)).ToListAsync();
 
-    public Task<List<Stocks>> GetAllStockNamesAsync()
+    public Task<List<Stock>> GetAllStockNamesAsync()
         => _db.Stocks
               .AsNoTracking()
               .OrderBy(s => s.Name)
-              .Select(s => new Stocks
+              .Select(s => new Stock
               {
                   Id = s.Id,
                   Name = s.Name,
@@ -31,7 +31,7 @@ public class StockRepository
               })
               .ToListAsync();
 
-    public Task AddAsync(Stocks stock) => _db.Stocks.AddAsync(stock).AsTask();
+    public Task AddAsync(Stock stock) => _db.Stocks.AddAsync(stock).AsTask();
 
     #endregion
 
@@ -103,7 +103,7 @@ public class StockRepository
 
     #endregion
 
-    public async Task<List<Stocks>> GetStockTickersAsync()
+    public async Task<List<Stock>> GetStockTickersAsync()
     {
         return await _db.Stocks
             .AsNoTracking()
