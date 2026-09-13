@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,57 +20,95 @@ public class AuthController : ControllerBase
     private readonly ProfileRepository _profileRepository;
     private readonly AppDbContext _context;
     private readonly IBrevoEmailService _brevoEmailService;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         TokenService tokenService,
         ProfileRepository profileRepository,
         AppDbContext context,
-        IBrevoEmailService brevoEmailService)
+        IBrevoEmailService brevoEmailService,
+        ILogger<AuthController> logger)
     {
         _userManager = userManager;
         _tokenService = tokenService;
         _profileRepository = profileRepository;
         _context = context;
         _brevoEmailService = brevoEmailService;
+        _logger = logger;
     }
 
 
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto model)
     {
-        var user = await _userManager.FindByNameAsync(model.Username);
-        if (user == null)
-            return Unauthorized("Invalid credentials");
+        // The username is logged so a reported failure can be correlated; the password never is.
+        var username = model?.Username;
 
-        var profile = await _profileRepository.GetProfileByUserIdAsync(user.Id, CancellationToken.None);
-        if (profile == null)
-            return Unauthorized("Profile not found for user");
-
-        var passwordValid = await _userManager.CheckPasswordAsync(user, model.Password);
-
-        if (!passwordValid)
-            return Unauthorized("Invalid credentials");
-
-        var token = await _tokenService.CreateTokenAsync(user);
-        var refreshToken = _tokenService.GenerateRefreshToken();
-
-        user.RefreshToken = refreshToken;
-        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
-        var result = await _userManager.UpdateAsync(user);
-
-        if (!result.Succeeded)
+        try
         {
-            return BadRequest(result.Errors);
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(model!.Password))
+            {
+                _logger.LogWarning("Login rejected: username or password was empty");
+                return Unauthorized("Invalid credentials");
+            }
+
+            var user = await _userManager.FindByNameAsync(username);
+            if (user == null)
+            {
+                _logger.LogWarning("Login failed for {Username}: no matching user", username);
+                return Unauthorized("Invalid credentials");
+            }
+
+            var profile = await _profileRepository.GetProfileByUserIdAsync(user.Id, CancellationToken.None);
+            if (profile == null)
+            {
+                _logger.LogWarning("Login failed for {Username} ({UserId}): no profile row", username, user.Id);
+                return Unauthorized("Profile not found for user");
+            }
+
+            var passwordValid = await _userManager.CheckPasswordAsync(user, model.Password);
+
+            if (!passwordValid)
+            {
+                _logger.LogWarning("Login failed for {Username} ({UserId}): incorrect password", username, user.Id);
+                return Unauthorized("Invalid credentials");
+            }
+
+            var token = await _tokenService.CreateTokenAsync(user);
+            var refreshToken = _tokenService.GenerateRefreshToken();
+
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+            var result = await _userManager.UpdateAsync(user);
+
+            if (!result.Succeeded)
+            {
+                _logger.LogError(
+                    "Login failed for {Username} ({UserId}): refresh token update rejected: {Errors}",
+                    username,
+                    user.Id,
+                    string.Join("; ", result.Errors.Select(e => $"{e.Code}: {e.Description}")));
+                return BadRequest(result.Errors);
+            }
+
+            _logger.LogInformation("Login succeeded for {Username} ({UserId})", username, user.Id);
+
+            return Ok(new
+            {
+                token = token,
+                refreshToken = refreshToken,
+                firstName = profile.FirstName,
+                lastName = profile.LastName,
+            });
         }
-
-        return Ok(new
+        catch (Exception ex)
         {
-            token = token,
-            refreshToken = refreshToken,
-            firstName = profile.FirstName,
-            lastName = profile.LastName,
-        });
+            _logger.LogError(ex, "Login threw an unhandled exception for {Username}", username);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new { message = "Login failed due to a server error." });
+        }
     }
 
     [HttpPost("google-login")]

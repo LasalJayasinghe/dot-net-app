@@ -1,4 +1,4 @@
-using dotnetApp;
+﻿using dotnetApp;
 using Serilog;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
@@ -15,6 +15,7 @@ using dotnetApp.Application.Interface;
 using dotnetApp.Application.Services;
 using dotnetApp.Application.Services.NewsProviders;
 using dotnetApp.Jobs;
+using Microsoft.AspNetCore.Diagnostics;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -22,6 +23,9 @@ Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft.Hosting.Lifetime", Serilog.Events.LogEventLevel.Warning)
     .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
     .Enrich.FromLogContext()
+    // The file sink writes inside the container, where nothing collects it - stdout is the only
+    // place a hosted environment (Render/Docker) actually picks logs up from.
+    .WriteTo.Console()
     .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day)
     .CreateLogger();
 
@@ -315,6 +319,8 @@ using (var scope = app.Services.CreateScope())
     await RoleSeeder.SeedRolesAndPermissionsAsync(scope.ServiceProvider);
 }
 
+app.UseSerilogRequestLogging();
+
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseCors(CorsPolicyName);
@@ -324,7 +330,28 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
-app.Map("/error", () => Results.Problem());
+app.Map("/error", (HttpContext http) =>
+{
+    // UseExceptionHandler re-executes into here; without pulling the exception off the feature
+    // the original stack trace is lost and the caller just sees a bare 500.
+    var handlerFeature = http.Features.Get<IExceptionHandlerFeature>();
+    var pathFeature = http.Features.Get<IExceptionHandlerPathFeature>();
+
+    if (handlerFeature?.Error is { } error)
+    {
+        Log.Error(
+            error,
+            "Unhandled exception on {Method} {Path}",
+            pathFeature?.Endpoint?.DisplayName ?? http.Request.Method,
+            pathFeature?.Path ?? http.Request.Path.Value);
+    }
+    else
+    {
+        Log.Error("Request failed on {Path} but no exception was captured", http.Request.Path.Value);
+    }
+
+    return Results.Problem();
+});
 
 // SignalR hub endpoint for the Crypto Trading Dashboard
 app.MapHub<CryptoHub>("/hubs/crypto");
