@@ -18,4 +18,4 @@ jobs:
           username: ${{ secrets.CONTABO_USER }}
           key: ${{ secrets.CONTABO_SSH_KEY }}
           script: |
-            sudo /usr/local/bin/deploy-alertme.sh
+             /usr/local/bin/deploy-alertme.sh
