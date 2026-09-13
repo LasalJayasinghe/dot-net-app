@@ -1,0 +1,18 @@
+# .env holds live secrets and must never be baked into an image — the Dockerfile
+# does "COPY . ./", which would otherwise copy it in and ship it to any registry.
+# Containers get their configuration from real environment variables instead
+# (docker run --env-file / -e), which override the file anyway.
+.env
+.env.local
+.env.*.local
+
+# Build output and local noise — keeps the build context small and stops a host
+# bin/obj built for a different runtime from leaking into the image.
+bin/
+obj/
+Logs/
+publish/
+.git/
+.vs/
+.vscode/
+**/node_modules/

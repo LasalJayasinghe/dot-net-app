@@ -1,4 +1,4 @@
-﻿using dotnetApp;
+using dotnetApp;
 using Serilog;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
@@ -29,6 +29,19 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day)
     .CreateLogger();
 
+
+// Configuration lives in .env, not appsettings.json, so that secrets stay out of the repo and
+// each environment (dev laptop, Contabo host, container) supplies its own values. Loaded before
+// CreateBuilder so the values are already in the process environment when the default
+// EnvironmentVariables provider reads them - that provider maps "__" to ":", so Jwt__Key in the
+// file arrives as Jwt:Key in IConfiguration and overrides anything left in appsettings.json.
+// onlyExactPath:false walks up parent directories, so running from bin/ still finds the file.
+DotNetEnv.Env.Load(options: new DotNetEnv.LoadOptions(
+    setEnvVars: true,
+    // A real environment variable (systemd unit, docker -e, CI secret) must beat the file,
+    // so the same image can be pointed at staging or production without editing .env.
+    clobberExistingVars: false,
+    onlyExactPath: false));
 
 var builder = WebApplication.CreateBuilder(args);
 
