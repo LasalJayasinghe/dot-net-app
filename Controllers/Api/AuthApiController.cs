@@ -20,6 +20,7 @@ public class AuthController : ControllerBase
     private readonly ProfileRepository _profileRepository;
     private readonly AppDbContext _context;
     private readonly IBrevoEmailService _brevoEmailService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -28,6 +29,7 @@ public class AuthController : ControllerBase
         ProfileRepository profileRepository,
         AppDbContext context,
         IBrevoEmailService brevoEmailService,
+        IConfiguration configuration,
         ILogger<AuthController> logger)
     {
         _userManager = userManager;
@@ -35,6 +37,7 @@ public class AuthController : ControllerBase
         _profileRepository = profileRepository;
         _context = context;
         _brevoEmailService = brevoEmailService;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -60,6 +63,13 @@ public class AuthController : ControllerBase
                 return Unauthorized("Invalid credentials");
             }
 
+            // Checked before the password, so guessing stops working while the account is locked.
+            if (await _userManager.IsLockedOutAsync(user))
+            {
+                _logger.LogWarning("Login rejected for {Username} ({UserId}): account is locked out", username, user.Id);
+                return Unauthorized(new { message = "Too many failed sign-in attempts. Try again in 15 minutes." });
+            }
+
             var profile = await _profileRepository.GetProfileByUserIdAsync(user.Id, CancellationToken.None);
             if (profile == null)
             {
@@ -71,9 +81,13 @@ public class AuthController : ControllerBase
 
             if (!passwordValid)
             {
+                // Counts toward lockout (5 failures -> 15 minutes, see AddIdentity in Program.cs).
+                await _userManager.AccessFailedAsync(user);
                 _logger.LogWarning("Login failed for {Username} ({UserId}): incorrect password", username, user.Id);
                 return Unauthorized("Invalid credentials");
             }
+
+            await _userManager.ResetAccessFailedCountAsync(user);
 
             var token = await _tokenService.CreateTokenAsync(user);
             var refreshToken = _tokenService.GenerateRefreshToken();
@@ -117,12 +131,22 @@ public class AuthController : ControllerBase
         if (request == null || string.IsNullOrWhiteSpace(request.IdToken))
             return BadRequest("ID token is missing.");
 
+        // The signature alone only proves Google issued the token for *some* app; any other site
+        // using Google sign-in could replay its visitors' tokens here. Only accept tokens issued to
+        // our own client ID (the same value as the dashboard's VITE_GOOGLE_CLIENT_ID).
+        var googleClientId = _configuration["Google:ClientId"];
+        if (string.IsNullOrWhiteSpace(googleClientId))
+        {
+            _logger.LogError("Google sign-in attempted but Google:ClientId is not configured");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Google sign-in is not configured." });
+        }
+
         GoogleJsonWebSignature.Payload payload;
         try
         {
-            // You can optionally pass validation settings here, including the specific Client ID to validate against.
-            // For now, we'll use the default validation which checks the signature against Google's public keys.
-            payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken);
+            payload = await GoogleJsonWebSignature.ValidateAsync(
+                request.IdToken,
+                new GoogleJsonWebSignature.ValidationSettings { Audience = new[] { googleClientId } });
         }
         catch (InvalidJwtException)
         {
@@ -131,6 +155,10 @@ public class AuthController : ControllerBase
 
         if (string.IsNullOrEmpty(payload.Email))
             return BadRequest("Google account has no email address.");
+
+        // Accounts are matched by email, so an unverified address could claim someone else's account.
+        if (!payload.EmailVerified)
+            return Unauthorized(new { message = "Your Google email address is not verified." });
 
         // Check if user exists
         var user = await _userManager.FindByEmailAsync(payload.Email);
