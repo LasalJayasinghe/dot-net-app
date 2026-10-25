@@ -1,0 +1,83 @@
+# AlertMe production stack: API + MySQL + Cloudflare Tunnel.
+#
+# Nothing here is published to the internet. The only way in is the outbound tunnel cloudflared
+# opens to Cloudflare, which forwards https://api.<your-domain> to http://api:8080 on the "edge"
+# network. MySQL is bound to the VPS's loopback only, for SSH-tunnel access from your laptop.
+#
+# Run from this folder:  docker compose up -d --build
+# Values come from deploy/.env (compose-level) and deploy/api.env (app settings).
+
+name: alertme
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-alertMe}
+      MYSQL_USER: ${MYSQL_USER:-alertme}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in deploy/.env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in deploy/.env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    # 127.0.0.1 only: reachable through `ssh -L`, never from the internet. Docker writes its own
+    # iptables rules that bypass UFW, so a bare "3306:3306" here would be wide open.
+    ports:
+      - "127.0.0.1:3306:3306"
+    networks: [db]
+    healthcheck:
+      # Probes the real TCP listener; the init-time server runs with networking off, so this only
+      # passes once MySQL is actually ready for the API.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    security_opt: [no-new-privileges:true]
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: alertme-api:latest
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file: api.env
+    # These win over api.env, so the DB password and CORS origin live in one place (deploy/.env).
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ReverseProxy__Cloudflare: "true"
+      ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-alertMe};User=${MYSQL_USER:-alertme};Password=${MYSQL_PASSWORD};"
+      Cors__AllowedOrigins__0: ${FRONTEND_ORIGIN:?set FRONTEND_ORIGIN in deploy/.env}
+    volumes:
+      - api-data:/data
+    networks: [edge, db]
+    # Immutable container: only /data (volume) and /tmp are writable, no Linux capabilities.
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1g
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in deploy/.env}
+    depends_on: [api]
+    # Only on "edge": even if cloudflared were compromised it has no route to MySQL.
+    networks: [edge]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+networks:
+  edge:
+  db:
+
+volumes:
+  mysql-data:
+  api-data:

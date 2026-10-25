@@ -16,3 +16,7 @@ publish/
 .vs/
 .vscode/
 **/node_modules/
+
+# Server deployment files - deploy/.env and deploy/api.env hold production secrets, and
+# .dockerignore patterns only match from the context root, so ".env" above does not cover them.
+deploy/

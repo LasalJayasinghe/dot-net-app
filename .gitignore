@@ -117,3 +117,6 @@ nunit-*.xml
 
 **/appsettings.Development.json
 *appsettings.json
+
+# Server-side secrets for the Docker deployment
+deploy/api.env

@@ -22,6 +22,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<OtpRecord> OtpRecords { get; set; } = null!;
     public DbSet<NewsArticle> NewsArticles { get; set; } = null!;
     public DbSet<Dividend> Dividends { get; set; } = null!;
+    public DbSet<DeviceToken> DeviceTokens { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -243,6 +244,33 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
             // Serves per-symbol history: equality on BaseSymbol, ordered by RecordDate.
             entity.HasIndex(d => new { d.BaseSymbol, d.RecordDate });
+        });
+
+        // ── DeviceToken ─────────────────────────────────────────────────────
+        builder.Entity<DeviceToken>(entity =>
+        {
+            entity.ToTable("DeviceTokens");
+            entity.HasKey(d => d.Id);
+
+            entity.Property(d => d.UserId).IsRequired().HasMaxLength(255);
+            // Expo tokens are ~41 chars; 255 leaves room for a format change.
+            entity.Property(d => d.Token).IsRequired().HasMaxLength(255);
+            entity.Property(d => d.Platform).HasMaxLength(20);
+            entity.Property(d => d.DeviceName).HasMaxLength(100);
+            entity.Property(d => d.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+            entity.Property(d => d.LastSeenAt).HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+            // One row per device, so re-registering under a second account moves
+            // the token instead of double-sending to the same handset.
+            entity.HasIndex(d => d.Token).IsUnique();
+
+            // Serves the alert job's "active tokens for this user" lookup.
+            entity.HasIndex(d => new { d.UserId, d.IsActive });
+
+            entity.HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
     }

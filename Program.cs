@@ -16,6 +16,7 @@ using dotnetApp.Application.Services;
 using dotnetApp.Application.Services.NewsProviders;
 using dotnetApp.Jobs;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.HttpOverrides;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -90,6 +91,7 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IPortfolioFileSyncService, PortfolioFileSyncService>();
 
 builder.Services.AddHttpClient<TelegramService>();
+builder.Services.AddHttpClient<IPushNotificationService, PushNotificationService>();
 builder.Services.AddHttpClient<IBrevoEmailService, BrevoEmailService>();
 
 builder.Services.AddSingleton<BinanceService>();
@@ -153,6 +155,7 @@ builder.Services.AddHostedService<AlertJob>();
 builder.Services.AddHostedService<CseDividendJob>();
 
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
+builder.Services.Configure<PushSettings>(builder.Configuration.GetSection("Push"));
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>()
@@ -288,6 +291,25 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Behind Cloudflare Tunnel every request reaches Kestrel from the cloudflared container, so without
+// this the rate limiter would lump all anonymous callers into one shared bucket and logs would show a
+// single IP. CF-Connecting-IP is set by Cloudflare's edge and overwrites anything the client sends.
+// Only enable this when the API has no published port - if it were reachable directly, any caller
+// could send the header and pick their own rate-limit partition.
+var behindCloudflare = builder.Configuration.GetValue<bool>("ReverseProxy:Cloudflare");
+if (behindCloudflare)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardedForHeaderName = "CF-Connecting-IP";
+        // cloudflared's address on the Docker network is not fixed, so trust comes from the network
+        // layout (nothing but cloudflared can reach the API) rather than an IP allowlist.
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
+
 var cs = builder.Configuration.GetConnectionString("DefaultConnection");
 if (cs != null)
 {
@@ -302,6 +324,12 @@ var bot = app.Services.GetRequiredService<TradingBotService>();
 
 binance.CandleClosed += async (c) => await bot.OnCandleClosed(c);
 
+// First in the pipeline so logging, HSTS, HTTPS redirection and rate limiting all see the real
+// client IP and the original https scheme.
+if (behindCloudflare)
+{
+    app.UseForwardedHeaders();
+}
 
 if (!app.Environment.IsDevelopment())
 {
