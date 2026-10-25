@@ -81,7 +81,9 @@ public class AlgorithmsApiController : ControllerBase
         return Ok(detail);
     }
 
+    // Anyone can sign up as a User, so starting/stopping trading is restricted to Admin.
     [HttpPost("{id}/toggle")]
+    [Authorize(Roles = "Admin")]
     public IActionResult Toggle(string id)
     {
         if (!_states.TryGetValue(id, out var state))

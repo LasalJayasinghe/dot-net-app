@@ -61,9 +61,12 @@ namespace dotnetApp.Infrastructure.Data.Seeders
                 }
             }
 
-            // 4️⃣ Optional: create a default admin user
+            // 4️⃣ Optional: create a default admin user. The password comes from Seed__AdminPassword
+            // rather than the source code - a password in the repo is one anyone can sign in with.
+            // When it is not set, no admin account is created.
+            var adminPassword = serviceProvider.GetRequiredService<IConfiguration>()["Seed:AdminPassword"];
             var adminUser = await userManager.FindByEmailAsync("admin@example.com");
-            if (adminUser == null)
+            if (adminUser == null && !string.IsNullOrWhiteSpace(adminPassword))
             {
                 adminUser = new ApplicationUser
                 {
@@ -71,7 +74,7 @@ namespace dotnetApp.Infrastructure.Data.Seeders
                     Email = "admin@example.com",
                     EmailConfirmed = true
                 };
-                await userManager.CreateAsync(adminUser, "Admin@123"); // Set default password
+                await userManager.CreateAsync(adminUser, adminPassword);
                 await userManager.AddToRoleAsync(adminUser, "Admin");
 
                 dbContext.Profiles.Add(new Profile
