@@ -86,7 +86,7 @@ public class AlertService
                         },
                         stoppingToken);
 
-                    alert.IsActive = false;
+                    // alert.IsActive = false;
                     _dbContext.Alerts.Update(alert);
                     hasChanges = true;
 
