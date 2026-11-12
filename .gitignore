@@ -120,3 +120,6 @@ nunit-*.xml
 
 # Server-side secrets for the Docker deployment
 deploy/api.env
+
+# Paper-trading bot state (runtime data, one JSON per bot)
+PaperTrading/

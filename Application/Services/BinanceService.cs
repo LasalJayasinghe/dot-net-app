@@ -6,7 +6,8 @@ using System.Collections.Concurrent;
 
 /// <summary>
 /// BackgroundService that maintains two Binance WebSocket connections:
-///   1. kline_5m (BTCUSDT) — fires CandleClosed event consumed by TradingBotService (unchanged behaviour)
+///   1. kline_5m (BTCUSDT) — pushes closed candles to the Crypto dashboard
+///      (the paper-trading bots get their own feeds from TradingEngine's combined stream)
 ///   2. !miniTicker@arr — streams 24h stats for all symbols, filtered to tracked pairs
 ///
 /// Real-time data is pushed to connected browser clients via SignalR (CryptoHub).
@@ -27,9 +28,6 @@ public class BinanceService : BackgroundService
     // ── Symbols tracked for the dashboard ────────────────────────────────────
     public static readonly string[] TrackedSymbols =
         ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT"];
-
-    // ── CandleClosed event — consumed by TradingBotService (DO NOT REMOVE) ───
-    public event Func<Candle, Task>? CandleClosed;
 
     // ── Internal dedup cache for candles ─────────────────────────────────────
     private readonly ConcurrentDictionary<string, DateTime> _candleCache     = new();
@@ -277,11 +275,7 @@ public class BinanceService : BackgroundService
                 Volume    = decimal.Parse(k.GetProperty("v").GetString()!, System.Globalization.CultureInfo.InvariantCulture)
             };
 
-            // ① Fire existing event — TradingBotService subscribes here (DO NOT REMOVE)
-            if (CandleClosed != null)
-                await CandleClosed.Invoke(candle);
-
-            // ② Push live candle update to dashboard via SignalR
+            // Push live candle update to dashboard via SignalR
             await _hub.Clients.All.SendAsync("CandleUpdate", new
             {
                 symbol   = candle.Symbol,

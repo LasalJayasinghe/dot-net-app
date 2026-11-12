@@ -1,3 +1,4 @@
+using dotnetApp.Application.Trading.Engine;
 using dotnetApp;
 using Serilog;
 using Microsoft.EntityFrameworkCore;
@@ -95,8 +96,27 @@ builder.Services.AddHttpClient<IPushNotificationService, PushNotificationService
 builder.Services.AddHttpClient<IBrevoEmailService, BrevoEmailService>();
 
 builder.Services.AddSingleton<BinanceService>();
-builder.Services.AddSingleton<IStrategy, EmaRsiStrategy>();
-builder.Services.AddSingleton<TradingBotService>();
+
+// Paper-trading engine: every ITradingStrategy below runs as its own bot ($1,000 paper account each,
+// Binance fee on both sides). State: PaperTrading/{id}.json. Config: PaperTrading__FeeRate, PaperTrading__InitialBalance.
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.EmaRsiStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.MacdStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.DonchianBreakoutStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.SupertrendStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.EmaCrossStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.BollingerReversionStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.RsiReversionStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.VwapReversionStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.BollingerSqueezeStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.MomentumRotationStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.EthBtcPairsStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.DcaStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.GridStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.OrderBookImbalanceStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.WhaleFollowStrategy>();
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.FundingContrarianStrategy>();
+builder.Services.AddSingleton<TradingEngine>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<TradingEngine>());
 
 // Crypto Dashboard services
 builder.Services.AddScoped<ICryptoMarketService, CryptoMarketService>();
@@ -325,10 +345,6 @@ if (cs != null)
 
 var app = builder.Build();
 
-var binance = app.Services.GetRequiredService<BinanceService>();
-var bot = app.Services.GetRequiredService<TradingBotService>();
-
-binance.CandleClosed += async (c) => await bot.OnCandleClosed(c);
 
 // First in the pipeline so logging, HSTS, HTTPS redirection and rate limiting all see the real
 // client IP and the original https scheme.
