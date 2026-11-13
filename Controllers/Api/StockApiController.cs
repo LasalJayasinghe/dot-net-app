@@ -19,8 +19,7 @@ public class StockApiController : ControllerBase
     [HttpGet("details/{symbol}")]
     public async Task<IActionResult> GetStock(string symbol)
     {
-        var lookup = symbol.Contains('.') ? symbol : $"{symbol}.N0000";
-        var data = await _stockService.GetStockDataAsync(lookup);
+        var data = await _stockService.GetStockDataAsync(CseSymbols.ToLookup(symbol));
         if (data == null)
             return NotFound(new { message = "Stock not found or API error." });
 
@@ -32,6 +31,25 @@ public class StockApiController : ControllerBase
         };
 
         return Ok(result);
+    }
+
+    /// <summary>Real CSE price history. range = 1D | 1W | 1M | 3M | 1Y | ALL.</summary>
+    [HttpGet("{symbol}/history")]
+    public async Task<IActionResult> GetHistory(string symbol, [FromQuery] string range = "1M")
+    {
+        var points = await _stockService.GetPriceHistoryAsync(symbol, range);
+        if (points == null)
+            return NotFound(new { message = "No price history available for this symbol." });
+
+        return Ok(points.Select(p => new
+        {
+            time = p.Time,
+            open = p.Open,
+            high = p.High,
+            low = p.Low,
+            close = p.Close,
+            volume = p.Volume,
+        }));
     }
 
     [HttpGet("intraday")]

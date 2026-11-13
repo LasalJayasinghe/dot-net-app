@@ -59,9 +59,7 @@ public class NewsApiController : ControllerBase
             .Take(limit)
             .ToListAsync();
 
-        var paymentDatesByExternalId = await _dbContext.Dividends
-            .AsNoTracking()
-            .ToDictionaryAsync(d => $"cse-dividend-{d.Id}", d => d.PaymentDate);
+        var paymentDatesByExternalId = await GetDividendPaymentDatesAsync(articles);
 
         var items = articles.Select(a => new
         {
@@ -107,9 +105,7 @@ public class NewsApiController : ControllerBase
             .Take(limit)
             .ToListAsync();
 
-        var paymentDatesByExternalId = await _dbContext.Dividends
-            .AsNoTracking()
-            .ToDictionaryAsync(d => $"cse-dividend-{d.Id}", d => d.PaymentDate);
+        var paymentDatesByExternalId = await GetDividendPaymentDatesAsync(articles);
 
         var items = articles.Select(a => new
         {
@@ -134,6 +130,31 @@ public class NewsApiController : ControllerBase
         });
 
         return Ok(items);
+    }
+
+    /// <summary>
+    /// Payment dates for the dividend articles on this page only. Articles are stored as
+    /// "cse-dividend-{CseAnnouncementId}" (see CseDividendJob.NewsExternalId).
+    /// </summary>
+    private async Task<Dictionary<string, DateTime?>> GetDividendPaymentDatesAsync(IEnumerable<NewsArticle> articles)
+    {
+        const string prefix = "cse-dividend-";
+        var announcementIds = articles
+            .Select(a => a.ExternalId)
+            .Where(id => id != null && id.StartsWith(prefix, StringComparison.Ordinal))
+            .Select(id => int.TryParse(id[prefix.Length..], out var n) ? n : (int?)null)
+            .Where(n => n.HasValue)
+            .Select(n => n!.Value)
+            .Distinct()
+            .ToList();
+
+        if (announcementIds.Count == 0)
+            return new Dictionary<string, DateTime?>();
+
+        return await _dbContext.Dividends
+            .AsNoTracking()
+            .Where(d => announcementIds.Contains(d.CseAnnouncementId))
+            .ToDictionaryAsync(d => $"{prefix}{d.CseAnnouncementId}", d => d.PaymentDate);
     }
 
     [HttpGet("status")]

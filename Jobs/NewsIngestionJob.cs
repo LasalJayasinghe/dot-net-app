@@ -35,7 +35,7 @@ public class NewsIngestionJob : BackgroundService
                 Console.WriteLine($"[NewsIngestionJob] Error in news background execution: {ex.Message}");
             }
 
-            // Run every 30 minutes
+            // Run every 45 minutes
             await Task.Delay(TimeSpan.FromMinutes(45), stoppingToken);
         }
     }

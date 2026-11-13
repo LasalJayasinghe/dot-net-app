@@ -73,6 +73,9 @@ builder.Services.AddControllers();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient<StockService>(client =>
 {
+    // cse.lk occasionally hangs; the default 100s timeout would stall AlertJob's polling loop.
+    client.Timeout = TimeSpan.FromSeconds(15);
+
     client.DefaultRequestHeaders.TryAddWithoutValidation(
         "Accept", "application/json, text/plain, */*");
 

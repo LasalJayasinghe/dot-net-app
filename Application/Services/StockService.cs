@@ -6,8 +6,28 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace dotnetApp;
 
+/// <summary>CSE symbol helpers. CSE APIs expect the full security code, e.g. "COMB.N0000".</summary>
+public static class CseSymbols
+{
+    /// <summary>"comb" / "COMB" → "COMB.N0000"; full codes ("COMB.X0000") are kept as-is.</summary>
+    public static string ToLookup(string symbol)
+    {
+        var s = (symbol ?? string.Empty).Trim().ToUpperInvariant();
+        return s.Length == 0 || s.Contains('.') ? s : $"{s}.N0000";
+    }
+
+    /// <summary>"COMB.N0000" → "COMB".</summary>
+    public static string BaseOf(string symbol)
+    {
+        var s = (symbol ?? string.Empty).Trim().ToUpperInvariant();
+        var dot = s.IndexOf('.');
+        return dot < 0 ? s : s[..dot];
+    }
+}
+
 public class StockService
 {
+    private const int MaxAttempts = 2;
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<StockService> _logger;
@@ -23,18 +43,44 @@ public class StockService
         _cache = cache;
     }
 
+    /// <summary>
+    /// POST to the CSE API with one retry on network errors, timeouts and 5xx responses.
+    /// The client timeout is set in Program.cs so a slow cse.lk can't stall the polling jobs.
+    /// </summary>
+    private async Task<HttpResponseMessage> PostAsync(string url, Func<HttpContent?>? content = null)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsync(url, content?.Invoke());
+                if ((int)response.StatusCode >= 500 && attempt < MaxAttempts)
+                {
+                    _logger.LogWarning("CSE {Url} returned {Status}; retrying.", url, (int)response.StatusCode);
+                    response.Dispose();
+                    await Task.Delay(TimeSpan.FromSeconds(attempt));
+                    continue;
+                }
+                return response;
+            }
+            catch (Exception ex) when (attempt < MaxAttempts && ex is HttpRequestException or TaskCanceledException)
+            {
+                _logger.LogWarning("CSE {Url} failed ({Error}); retrying.", url, ex.Message);
+                await Task.Delay(TimeSpan.FromSeconds(attempt));
+            }
+        }
+    }
+
+    private static bool IsTransient(Exception ex) => ex is HttpRequestException or TaskCanceledException;
+
     public async Task<StockDataResponseDto?> GetStockDataAsync(string symbol)
     {
+        symbol = CseSymbols.ToLookup(symbol);
         try
         {
-            var formData = new FormUrlEncodedContent(new[]
-            {
-                new KeyValuePair<string, string>("symbol", symbol)
-            });
-
-            var response = await _httpClient.PostAsync(
+            var response = await PostAsync(
                 "https://www.cse.lk/api/companyInfoSummery",
-                formData
+                () => new FormUrlEncodedContent(new[] { new KeyValuePair<string, string>("symbol", symbol) })
             );
 
             response.EnsureSuccessStatusCode();
@@ -68,7 +114,7 @@ public class StockService
             }
             return null;
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (IsTransient(ex))
         {
             Console.WriteLine($"Request error: {ex.Message}");
             return null;
@@ -79,7 +125,7 @@ public class StockService
     {
         try
         {
-            var response = await _httpClient.PostAsync("https://www.cse.lk/api/tradeSummary", null);
+            var response = await PostAsync("https://www.cse.lk/api/tradeSummary");
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
@@ -91,6 +137,14 @@ public class StockService
                 _logger.LogWarning("No trading summary data received.");
                 return;
             }
+
+            // CSE's internal ids are needed for chart history lookups.
+            _cache.Set(StockIdsCacheKey,
+                stockItems.ReqTradeSummery
+                    .Where(i => i.Id > 0 && !string.IsNullOrEmpty(i.Symbol))
+                    .GroupBy(i => i.Symbol, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase),
+                TimeSpan.FromDays(1));
 
             // Get all symbols in the response
             var symbols = stockItems.ReqTradeSummery.Select(s => s.Symbol).ToList();
@@ -142,7 +196,7 @@ public class StockService
 
             // _logger.LogInformation("Trading Summary Data updated at {Time}", DateTime.Now);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (IsTransient(ex))
         {
             _logger.LogError(ex, "Request error while fetching trading summary");
         }
@@ -152,6 +206,86 @@ public class StockService
         }
     }
 
+
+    private const string StockIdsCacheKey = "cse-stock-ids";
+
+    /// <summary>
+    /// Real price history from cse.lk (companyChartDataByStock).
+    /// range: 1D (intraday trades), 1W, 1M, 3M, 1Y, ALL (daily closes; CSE serves about one year).
+    /// CSE daily points carry high/low/close/volume but no open, so open = previous close.
+    /// </summary>
+    public async Task<List<PriceHistoryPointDto>?> GetPriceHistoryAsync(string symbol, string range)
+    {
+        symbol = CseSymbols.ToLookup(symbol);
+        range = (range ?? "1M").ToUpperInvariant();
+        var intraday = range == "1D";
+
+        var cacheKey = $"cse-history:{symbol}:{(intraday ? "1D" : "daily")}";
+        if (!_cache.TryGetValue(cacheKey, out List<PriceHistoryPointDto>? points) || points is null)
+        {
+            var stockId = await GetCseStockIdAsync(symbol);
+            if (stockId is null) return null;
+
+            try
+            {
+                var response = await PostAsync("https://www.cse.lk/api/companyChartDataByStock",
+                    () => new FormUrlEncodedContent(new[]
+                    {
+                        new KeyValuePair<string, string>("stockId", stockId.Value.ToString()),
+                        new KeyValuePair<string, string>("period", intraday ? "1" : "5"),
+                    }));
+                response.EnsureSuccessStatusCode();
+
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                points = new List<PriceHistoryPointDto>();
+                if (doc.RootElement.TryGetProperty("chartData", out var arr) && arr.ValueKind == JsonValueKind.Array)
+                {
+                    decimal? prevClose = null;
+                    foreach (var p in arr.EnumerateArray())
+                    {
+                        var close = Dec(p, "p");
+                        if (close <= 0 || !p.TryGetProperty("t", out var t) || t.ValueKind != JsonValueKind.Number) continue;
+
+                        var open = prevClose ?? close;
+                        // Intraday h/l are the running day high/low, so draw each trade as a point.
+                        var high = intraday ? Math.Max(open, close) : Math.Max(Dec(p, "h"), Math.Max(open, close));
+                        var low = intraday ? Math.Min(open, close) : MinPositive(Dec(p, "l"), Math.Min(open, close));
+                        points.Add(new PriceHistoryPointDto(t.GetInt64() / 1000, open, high, low, close, Dec(p, "q")));
+                        prevClose = close;
+                    }
+                }
+
+                _cache.Set(cacheKey, points, intraday ? TimeSpan.FromMinutes(1) : TimeSpan.FromMinutes(30));
+            }
+            catch (Exception ex) when (IsTransient(ex) || ex is JsonException)
+            {
+                _logger.LogWarning(ex, "Failed to fetch CSE price history for {Symbol}", symbol);
+                return null;
+            }
+        }
+
+        if (intraday) return points;
+
+        var days = range switch { "1W" => 7, "1M" => 31, "3M" => 92, _ => 0 };
+        if (days == 0) return points;
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-days).ToUnixTimeSeconds();
+        return points.Where(p => p.Time >= cutoff).ToList();
+
+        static decimal Dec(JsonElement e, string name) =>
+            e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDecimal() : 0m;
+        static decimal MinPositive(decimal a, decimal b) => a > 0 ? Math.Min(a, b) : b;
+    }
+
+    /// <summary>Symbol → CSE internal id, from the cached trade summary (refreshed by AlertJob).</summary>
+    private async Task<int?> GetCseStockIdAsync(string symbol)
+    {
+        if (!_cache.TryGetValue(StockIdsCacheKey, out Dictionary<string, int>? ids) || ids is null)
+        {
+            await GetTradingSummaryAsync();
+            _cache.TryGetValue(StockIdsCacheKey, out ids);
+        }
+        return ids != null && ids.TryGetValue(symbol, out var id) ? id : null;
+    }
 
     public async Task<List<Stock>> GetAllStockNamesAsync()
     {
@@ -175,7 +309,7 @@ public class StockService
     {
         try
         {
-            var response = await _httpClient.PostAsync("https://www.cse.lk/api/marketStatus", null);
+            var response = await PostAsync("https://www.cse.lk/api/marketStatus");
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
@@ -195,7 +329,7 @@ public class StockService
             Console.WriteLine($"Market Status: {marketStatusDto?.status} at {DateTime.Now}");
             return marketStatusDto;
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (IsTransient(ex))
         {
             Console.WriteLine($"Request error: {ex.Message}");
             return null;
@@ -206,12 +340,12 @@ public class StockService
     {
         try
         {
-            var response = await _httpClient.PostAsync("https://www.cse.lk/api/topGainers", null);
+            var response = await PostAsync("https://www.cse.lk/api/topGainers");
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
             var logContent = content.Length > 1000 ? content[..1000] + "..." : content;
-            _logger.LogInformation("TopGainers response content: {ResponseContent}", logContent);
+            _logger.LogDebug("TopGainers response content: {ResponseContent}", logContent);
 
             var options = new JsonSerializerOptions
             {
@@ -221,7 +355,7 @@ public class StockService
             var topGainers = JsonSerializer.Deserialize<List<StockTopDto>>(content, options);
             return topGainers ?? new List<StockTopDto>();
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (IsTransient(ex))
         {
             Console.WriteLine($"Request error: {ex.Message}");
             return new List<StockTopDto>();
@@ -232,7 +366,7 @@ public class StockService
     {
         try
         {
-            var response = await _httpClient.PostAsync("https://www.cse.lk/api/topLooses", null);
+            var response = await PostAsync("https://www.cse.lk/api/topLooses");
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
@@ -244,7 +378,7 @@ public class StockService
             var topLooses = JsonSerializer.Deserialize<List<StockTopDto>>(content, options);
             return topLooses ?? new List<StockTopDto>();
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (IsTransient(ex))
         {
             Console.WriteLine($"Request error: {ex.Message}");
             return new List<StockTopDto>();
@@ -255,7 +389,7 @@ public class StockService
     {
         try
         {
-            var response = await _httpClient.PostAsync("https://www.cse.lk/api/aspiData", null);
+            var response = await PostAsync("https://www.cse.lk/api/aspiData");
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
@@ -281,7 +415,7 @@ public class StockService
             await _stockRepository.AddAsync(marketIndex);
             return aspiData;
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (IsTransient(ex))
         {
             Console.WriteLine($"Request error: {ex.Message}");
             return null;
@@ -292,7 +426,7 @@ public class StockService
     {
         try
         {
-            var response = await _httpClient.PostAsync("https://www.cse.lk/api/snpData", null);
+            var response = await PostAsync("https://www.cse.lk/api/snpData");
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
@@ -320,7 +454,7 @@ public class StockService
             await _stockRepository.AddAsync(marketIndex);
             return snpData;
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (IsTransient(ex))
         {
             Console.WriteLine($"Request error: {ex.Message}");
             return new StockIndicesDto();

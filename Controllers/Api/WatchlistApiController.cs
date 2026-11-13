@@ -35,12 +35,31 @@ public class WatchlistApiController : ControllerBase
         if (symbols.Count == 0)
             return Ok(Array.Empty<object>());
 
-        var results = new List<object>();
-        foreach (var symbol in symbols)
-        {
-            var data = await _stockService.GetStockDataAsync(ToLookupSymbol(symbol));
-            if (data == null) continue;
+        // Prices come from the Stocks table, which AlertJob refreshes from CSE's tradeSummary every
+        // 2 minutes during market hours. Only symbols missing from it fall back to a live CSE call.
+        var lookups = symbols.Select(ToLookupSymbol).Distinct().ToList();
+        var stored = await _dbContext.Stocks
+            .AsNoTracking()
+            .Where(s => lookups.Contains(s.Symbol))
+            .Select(s => new { s.Symbol, s.Price, s.PercentageChange })
+            .ToDictionaryAsync(s => s.Symbol);
 
+        // Sequential on purpose: StockService shares this request's DbContext, which isn't thread-safe.
+        var live = new Dictionary<string, dotnetApp.Application.Dtos.StockDataResponseDto?>();
+        foreach (var l in lookups.Where(l => !stored.ContainsKey(l)))
+            live[l] = await _stockService.GetStockDataAsync(l);
+
+        var results = new List<object>(symbols.Count);
+        foreach (var lookup in lookups)
+        {
+            if (stored.TryGetValue(lookup, out var s))
+            {
+                results.Add(new { symbol = s.Symbol, price = s.Price, changePct = s.PercentageChange });
+                continue;
+            }
+
+            var data = live.GetValueOrDefault(lookup);
+            if (data == null) continue;
             results.Add(new
             {
                 symbol = data.ReqSymbolInfo.Symbol,
@@ -107,10 +126,7 @@ public class WatchlistApiController : ControllerBase
         return NoContent();
     }
 
-    private static string ToLookupSymbol(string input)
-    {
-        return input.Contains('.') ? input : $"{input}.N0000";
-    }
+    private static string ToLookupSymbol(string input) => CseSymbols.ToLookup(input);
 
     public class AddWatchlistDto
     {

@@ -18,9 +18,12 @@ public class NewsIngestionService
 
     private static readonly string[] CseKeywords = new[]
     {
-        "cse", "colombo stock exchange", "central bank", "cbsl", "lkr", "treasury", "sec",
+        // Matched as whole words/phrases (see KeywordRegex), so "sec" no longer matches "second"
+        // and "comb" no longer matches "combat". "rupiah" (Indonesia) replaced by "rupee".
+        "cse", "colombo stock exchange", "central bank", "cbsl", "lkr", "treasury",
+        "securities and exchange commission", "sec sri lanka",
         "commercial bank", "comb", "sampath", "samp", "john keells", "jkh", "hayleys",
-        "inflation", "imf", "gdp", "ipo", "dividend", "sri lanka", "rupiah", "central bank of sri lanka"
+        "inflation", "imf", "gdp", "ipo", "dividend", "sri lanka", "rupee", "central bank of sri lanka"
     };
 
     private static readonly string[] GlobalKeywords = new[]
@@ -113,9 +116,15 @@ public class NewsIngestionService
         return entitiesToSave.Count;
     }
 
-    private bool IsTier1Candidate(RawNewsArticleDto article)
-    {
-        var textToScan = $"{article.Title} {article.Text}".ToLowerInvariant();
-        return CseKeywords.Any(kw => textToScan.Contains(kw)) || GlobalKeywords.Any(kw => textToScan.Contains(kw));
-    }
+    // One compiled regex with word boundaries: "\b(cse|colombo stock exchange|...)\b".
+    private static readonly System.Text.RegularExpressions.Regex KeywordRegex = new(
+        @"\b(" + string.Join("|", CseKeywords.Concat(GlobalKeywords)
+            .OrderByDescending(k => k.Length)
+            .Select(System.Text.RegularExpressions.Regex.Escape)) + @")\b",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase
+        | System.Text.RegularExpressions.RegexOptions.CultureInvariant
+        | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private bool IsTier1Candidate(RawNewsArticleDto article) =>
+        KeywordRegex.IsMatch($"{article.Title} {article.Text}");
 }

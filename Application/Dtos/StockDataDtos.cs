@@ -44,6 +44,8 @@ public class TradeSummaryResponseDto
 
 public class TradeSummaryItemDto
 {
+    /// <summary>CSE internal security id (needed by companyChartDataByStock).</summary>
+    public int Id { get; set; }
     public string Symbol { get; set; } = default!;
     public string Name { get; set; } = default!;
     public decimal Price { get; set; }
@@ -91,3 +93,6 @@ public class StockIntraDay
     public decimal percentage { get; set; }
     public decimal volatility { get; set; }
 }
+
+/// <summary>One point of a CSE price chart. Time is Unix seconds (UTC).</summary>
+public record PriceHistoryPointDto(long Time, decimal Open, decimal High, decimal Low, decimal Close, decimal Volume);

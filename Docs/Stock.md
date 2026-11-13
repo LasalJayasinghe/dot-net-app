@@ -1,82 +1,78 @@
 # Stock Documentation
 
-This document provides a comprehensive overview of all stock-related features, services, data models, and APIs in the application.
+Stock (CSE) features, services, data models and APIs.
 
 ## Overview
-The stock module is responsible for:
-- Fetching and updating stock data from the CSE API
-- Fetching and storing CSE dividend announcements
-- Managing stock entities in the database
-- Providing APIs for stock data retrieval
-- Supporting alerting and notification features based on stock prices
+The stock module:
+- fetches prices, indices and market status from the CSE API (cse.lk) and stores the latest snapshot
+- serves real price history from CSE for charts and technical summaries
+- fetches and stores CSE dividend announcements
+- provides stock APIs for the web and mobile apps and the AI assistant
+- drives price alerts (Telegram and push)
 
-## Data Flow
-1. **StockService** fetches data from the CSE API and updates the database.
-2. **StockController** exposes endpoints for retrieving stock data.
-3. **CseDividendJob** fetches CSE dividend announcements and upserts `Dividends`.
-4. **NewsApiController** enriches news responses with `dividendPaymentDate` when available.
-5. **AlertService** uses stock data to trigger alerts.
+## Data flow
+1. **AlertJob** polls CSE through **StockService**:
+   - trade summary every 2 min while the market is open (60 min when closed)
+   - indices and market status
+   - it upserts the `Stocks`, `CseMarketIndices` and `CseMarketStatus` rows
+2. **StockApiController** serves stock data from the database. Price history is fetched live from CSE and cached.
+3. **CseDividendJob** fetches CSE dividend announcements hourly and upserts `Dividends`, plus a news article per announcement.
+4. **NewsApiController** adds `dividendPaymentDate` to dividend news articles.
+5. **AlertService** compares stored prices with user alerts and notifies through Telegram and Expo push.
 
-## Key Classes & Files
-- **Application/Services/StockService.cs**: Core logic for fetching, updating, and caching stock data.
-- **Controllers/StockController.cs**: API endpoints for stock data.
-- **Jobs/CseDividendJob.cs**: Scheduled CSE dividend ingestion worker.
-- **Controllers/Api/DividendsApiController.cs**: Dividend history API per symbol.
-- **Controllers/Api/NewsApiController.cs**: Stock news APIs with dividend payment date metadata.
-- **Application/Dtos/StockDataDtos.cs**: Data transfer objects for stock API responses.
-- **Models/Stocks.cs**: Entity model for stocks in the database.
+## Key files
+- `Application/Services/StockService.cs`:
+  - CSE client (15s timeout, one retry)
+  - trade summary sync and price history
+  - also holds `CseSymbols`, the symbol helper (`COMB` → `COMB.N0000`)
+- `Controllers/Api/StockApiController.cs`: stock endpoints (below)
+- `Controllers/Api/WatchlistApiController.cs`: user watchlist, priced from the `Stocks` table
+- `Jobs/AlertJob.cs`, `Jobs/CseDividendJob.cs`: background polling
+- `Controllers/Api/DividendsApiController.cs`, `Controllers/Api/NewsApiController.cs`
+- `Application/Dtos/StockDataDtos.cs`: CSE response DTOs
+- `Domain/Entities/CSE/Stock.cs`, `MarketStatus.cs`, `MarketIndices.cs`: entities
+- `Infrastructure/Repositories/StockRepository.cs`: persistence and trading-day detection
+- `Application/Services/Ai/Tools/GetStockDataTool.cs`, `GetMarketStatusTool.cs`: AI assistant tools
 
-## Main Features
-- **Get All Stock Names**: `GetAllStockNamesAsync()` returns a list of all stocks for dropdowns and selection.
-- **Get Stock Data**: `GetStockDataAsync(symbol)` fetches and updates stock data for a given symbol.
-- **Trading Summary**: `GetTradingSummaryAsync()` fetches and updates trading summary data for all stocks.
-- **Alert Integration**: Alerts can be set based on stock price changes.
-- **Dividend History by Symbol**: `/api/dividends/symbol/{symbol}` returns recent dividend records.
-- **Payment-Date-Focused News**: stock news endpoints surface dividend payment dates for UI prioritization.
+## API (`/api/stocks`, JWT required)
 
-## Example Usage
-- The `StockController` exposes an endpoint `/api/stock/{symbol}` to get stock data.
-- The `AlertController` uses `StockService` to populate stock dropdowns and validate alerts.
-- The `TelegramController` can fetch stock data and send it to users via Telegram.
+| Endpoint | Description |
+|---|---|
+| `GET details/{symbol}` | Live CSE quote. Accepts `COMB` or `COMB.N0000` |
+| `GET {symbol}/history?range=1D\|1W\|1M\|3M\|1Y` | Real CSE price history, oldest first. `1D` = today's trades; other ranges are daily bars from about one year of history |
+| `GET summary` | Top 50 stocks by % change, from the database |
+| `GET intraday` | Most volatile stocks today |
+| `GET movers` | Top gainers and losers (live CSE) |
+| `GET indices` | ASPI and S&P SL20 (stored) |
+| `GET market-status` | Open/closed and trading day |
+| `GET names` | Symbol and name list (cached 1h) |
 
-## Data Models
-- **Stocks**: Represents a stock entity with properties like Symbol, Name, Price, High, Low, PreviousClose, etc.
-- **StockDataResponseDto**: DTO for stock data API responses.
-- **TradeSummaryItemDto**: DTO for trading summary items.
-
-## Example: Stock Entity
-```csharp
-public class Stocks {
-    public int Id { get; set; }
-    public string Symbol { get; set; }
-    public string Name { get; set; }
-    public decimal Price { get; set; }
-    public decimal Change { get; set; }
-    public decimal PercentageChange { get; set; }
-    public decimal High { get; set; }
-    public decimal Low { get; set; }
-    public decimal PreviousClose { get; set; }
-    public decimal ClosingPrice { get; set; }
-}
-```
-
-## API Example
+### Example
 ```http
-GET /api/stock/ABAN.N0000
+GET /api/stocks/details/ABAN
 ```
-Response:
 ```json
-{
-  "Symbol": "ABAN.N0000",
-  "Price": 123.45,
-  "LastTradedPrice": 123.00
-}
+{ "symbol": "ABAN.N0000", "price": 1018.5, "lastTradedPrice": 1018.5 }
 ```
 
-## Related Features
-- Alerts based on stock price
-- Stock search and dashboard
-- Dividend panel in stock detail view
-- Integration with Telegram notifications
+```http
+GET /api/stocks/JKH/history?range=1M
+```
+```json
+[{ "time": 1760380200, "open": 19.5, "high": 19.9, "low": 19.4, "close": 19.7, "volume": 8313818 }]
+```
+`time` is Unix seconds (UTC). CSE daily data has no open price, so `open` is the previous close.
 
----
+## CSE endpoints used
+All are POST requests to `https://www.cse.lk/api/...`; see `mark document/CSE Research Automation/Task.md` for the probe notes.
+
+| Endpoint | Used for |
+|---|---|
+| `tradeSummary` | All ~294 stocks: OHLC, volume, turnover, market cap, and the internal `id` |
+| `companyInfoSummery` (`symbol`) | Single-stock quote |
+| `companyChartDataByStock` (`stockId`, `period`) | Price history: `1` = intraday, `5` = about 1 year daily |
+| `marketStatus`, `aspiData`, `snpData`, `topGainers`, `topLooses` | Market overview |
+| `approvedAnnouncement`, `getAnnouncementById` | Dividend announcements (`CseDividendJob`) |
+
+## Trading day
+`IsTradingDay` is true on a weekday only if CSE actually opens: before 09:45 Colombo time it is assumed true, after that only if the market was reported open that day. This treats holidays correctly.

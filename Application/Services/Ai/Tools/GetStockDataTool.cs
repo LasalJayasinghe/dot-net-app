@@ -14,7 +14,7 @@ public class GetStockDataTool : IMcpTool
 
     public string Name => "get_stock_price";
 
-    public string Description => "Gets the current price and basic data for a specific local stock symbol (e.g., COMB, SAMP).";
+    public string Description => "Gets the current price and basic data for a Colombo Stock Exchange (CSE) symbol. Accepts the short code (e.g. COMB, SAMP) or the full code (e.g. COMB.N0000).";
 
     public object ParametersSchema => new
     {
@@ -39,6 +39,7 @@ public class GetStockDataTool : IMcpTool
                 var symbol = symbolElement.GetString();
                 if (string.IsNullOrEmpty(symbol)) return "Symbol is required.";
                 
+                // StockService normalizes "COMB" → "COMB.N0000" (the CSE API needs the full code).
                 var data = await _stockService.GetStockDataAsync(symbol);
                 if (data == null) return $"No data found for symbol {symbol}.";
                 

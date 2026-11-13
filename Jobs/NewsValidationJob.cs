@@ -37,7 +37,12 @@ public class NewsValidationJob : BackgroundService
 
                 // If processed articles, short pause before checking next pending batch;
                 // if no articles were pending, wait 10 seconds.
-                if (processedCount > 0)
+                if (processedCount == NewsValidationService.OllamaUnavailable)
+                {
+                    // Ollama down: back off instead of retrying every few seconds.
+                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+                }
+                else if (processedCount > 0)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
                 }

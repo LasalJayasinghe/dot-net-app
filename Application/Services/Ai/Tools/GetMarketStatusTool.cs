@@ -14,7 +14,7 @@ public class GetMarketStatusTool : IMcpTool
 
     public string Name => "get_market_status";
 
-    public string Description => "Gets the current overall status of the local stock market (open/closed, indices summary).";
+    public string Description => "Gets the Colombo Stock Exchange status (open/closed, trading day, hours) and the ASPI and S&P SL20 index values.";
 
     public object ParametersSchema => new
     {
@@ -27,8 +27,27 @@ public class GetMarketStatusTool : IMcpTool
     {
         try
         {
-            var data = await _stockService.GetSavedMarketStatusAsync();
-            return data != null ? JsonSerializer.Serialize(data) : "Market status not available.";
+            var status = await _stockService.GetSavedMarketStatusAsync();
+            var aspi = await _stockService.GetSavedAspiDataAsync();
+            var snp = await _stockService.GetSavedSnpDataAsync();
+
+            return JsonSerializer.Serialize(new
+            {
+                market = status == null ? null : new
+                {
+                    status.IsOpen,
+                    status.IsTradingDay,
+                    OpenTime = status.OpenTime.ToString("HH:mm"),
+                    CloseTime = status.CloseTime.ToString("HH:mm"),
+                    TimeZone = "Asia/Colombo",
+                    status.UpdatedAt,
+                },
+                indices = new[]
+                {
+                    new { Name = "ASPI", Value = aspi.value, Change = aspi.change, ChangePercent = aspi.percentage, High = aspi.highValue, Low = aspi.lowValue },
+                    new { Name = "S&P SL20", Value = snp.value, Change = snp.change, ChangePercent = snp.percentage, High = snp.highValue, Low = snp.lowValue },
+                },
+            });
         }
         catch (Exception ex)
         {

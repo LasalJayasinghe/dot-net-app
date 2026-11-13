@@ -43,10 +43,7 @@ public class StockRepository
     public async Task AddAsync(MarketStatus data)
     {
         var entity = await this.GetMarketStatusAsync();
-
-        bool isTradingDay =
-            DateTime.UtcNow.DayOfWeek != DayOfWeek.Saturday &&
-            DateTime.UtcNow.DayOfWeek != DayOfWeek.Sunday;
+        bool isTradingDay = IsTradingDay(entity, data.IsOpen);
 
         if (entity == null)
         {
@@ -65,6 +62,36 @@ public class StockRepository
         await _db.SaveChangesAsync();
     }
     
+    private static readonly TimeZoneInfo Colombo = ResolveColombo();
+    private static readonly TimeSpan OpenGrace = new(9, 45, 0); // CSE opens 09:30
+
+    /// <summary>
+    /// A weekday is only a trading day if the market actually opens (CSE has many public/poya holidays).
+    /// Before 09:45 a weekday is assumed to be a trading day; after that it counts only if CSE reported
+    /// the market open at some point today.
+    /// </summary>
+    private static bool IsTradingDay(MarketStatus? previous, bool isOpenNow)
+    {
+        var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Colombo);
+        if (now.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) return false;
+        if (isOpenNow) return true;
+        if (now.TimeOfDay < OpenGrace) return true;
+
+        // Market closed now: keep "trading day" only if it was confirmed earlier today (after 09:45 or while open).
+        if (previous is null || !previous.IsTradingDay) return false;
+        var prev = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(previous.UpdatedAt, DateTimeKind.Utc), Colombo);
+        return prev.Date == now.Date && (previous.IsOpen || prev.TimeOfDay >= OpenGrace);
+    }
+
+    private static TimeZoneInfo ResolveColombo()
+    {
+        foreach (var id in new[] { "Asia/Colombo", "Sri Lanka Standard Time" })
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById(id); } catch (TimeZoneNotFoundException) { }
+        }
+        return TimeZoneInfo.CreateCustomTimeZone("LK", TimeSpan.FromHours(5.5), "Colombo", "Colombo");
+    }
+
     #endregion
 
     #region MarketIndices

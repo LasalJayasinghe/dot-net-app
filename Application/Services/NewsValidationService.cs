@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -16,6 +17,14 @@ namespace dotnetApp.Application.Services;
 
 public class NewsValidationService
 {
+    /// <summary>Returned when Ollama is unreachable, so the job backs off instead of hammering it.</summary>
+    public const int OllamaUnavailable = -1;
+
+    private const int MaxAttemptsPerArticle = 3;
+    private const int SnippetLength = 600;
+
+    // Per-article failure counts (static: the service is scoped, the job creates a new one per batch).
+    private static readonly ConcurrentDictionary<int, int> FailedAttempts = new();
     private readonly AppDbContext _dbContext;
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
@@ -71,7 +80,7 @@ public class NewsValidationService
         for (int idx = 0; idx < pendingArticles.Count; idx++)
         {
             var text = !string.IsNullOrWhiteSpace(pendingArticles[idx].Summary) ? pendingArticles[idx].Summary : pendingArticles[idx].Title;
-            var snippet = text.Length > 200 ? text.Substring(0, 200) + "..." : text;
+            var snippet = text.Length > SnippetLength ? text.Substring(0, SnippetLength) + "..." : text;
             sb.AppendLine($"[Item {idx}] Title: {pendingArticles[idx].Title} | Content: {snippet}");
         }
 
@@ -83,119 +92,141 @@ public class NewsValidationService
             format = "json",
             options = new
             {
-                num_predict = 400,
+                num_predict = 1500, // ~250 tokens per article; 400 truncated the JSON for 5-article batches
                 temperature = 0.1
             }
         };
 
+        string llmResponse;
         try
         {
             var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
             using var response = await _httpClient.PostAsync($"{baseUrl}/api/generate", jsonContent, ct);
 
-            if (response.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                var responseJson = await response.Content.ReadAsStringAsync(ct);
-                using var doc = JsonDocument.Parse(responseJson);
+                _logger.LogWarning("Ollama returned HTTP {StatusCode} during news validation; will retry later.", response.StatusCode);
+                return OllamaUnavailable;
+            }
 
-                if (doc.RootElement.TryGetProperty("response", out var respProp))
-                {
-                    var llmResponse = respProp.GetString() ?? "";
-                    ParseAndUpdateBatch(llmResponse, pendingArticles);
-                }
-            }
-            else
-            {
-                _logger.LogWarning("Ollama returned HTTP status {StatusCode} during validation", response.StatusCode);
-                MarkBatchAsValidatedWithFallback(pendingArticles);
-            }
+            var responseJson = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(responseJson);
+            llmResponse = doc.RootElement.TryGetProperty("response", out var respProp) ? respProp.GetString() ?? "" : "";
         }
-        catch (Exception ex)
+        catch (Exception ex) when ((ex is HttpRequestException || ex is TaskCanceledException) && !ct.IsCancellationRequested)
         {
-            _logger.LogError(ex, "Error validating news batch with Ollama LLM");
-            MarkBatchAsValidatedWithFallback(pendingArticles);
+            // Ollama down/unreachable: leave the articles pending (don't mark them validated with defaults).
+            _logger.LogWarning("Ollama unreachable for news validation ({Error}); will retry later.", ex.Message);
+            return OllamaUnavailable;
         }
+
+        var knownTickers = await LoadKnownTickersAsync(ct);
+        var processed = ParseAndUpdateBatch(llmResponse, pendingArticles, knownTickers);
+
+        // Articles the model skipped or answered with unparseable output: retry a few times, then give up
+        // explicitly so one bad article can't block the queue forever.
+        foreach (var article in pendingArticles.Where(a => !processed.Contains(a.Id)))
+        {
+            var attempts = FailedAttempts.AddOrUpdate(article.Id, 1, (_, n) => n + 1);
+            if (attempts >= MaxAttemptsPerArticle)
+            {
+                article.IsModelValidated = true;
+                article.ValidationReasoning = $"AI validation failed after {attempts} attempts; using ingestion defaults.";
+                FailedAttempts.TryRemove(article.Id, out _);
+                _logger.LogWarning("News article {Id} could not be validated after {Attempts} attempts.", article.Id, attempts);
+            }
+        }
+        foreach (var id in processed) FailedAttempts.TryRemove(id, out _);
 
         await _dbContext.SaveChangesAsync(ct);
-        _logger.LogInformation("Completed validation for {Count} articles.", pendingArticles.Count);
+        _logger.LogInformation("News validation: {Ok}/{Total} articles validated.", processed.Count, pendingArticles.Count);
         return pendingArticles.Count;
     }
 
-    private void ParseAndUpdateBatch(string llmResponse, List<NewsArticle> batch)
+    /// <summary>CSE symbols from the Stocks table plus the crypto pairs the app tracks.</summary>
+    private async Task<HashSet<string>> LoadKnownTickersAsync(CancellationToken ct)
     {
+        var cse = await _dbContext.Stocks.AsNoTracking().Select(s => s.Symbol).ToListAsync(ct);
+        var set = new HashSet<string>(cse, StringComparer.OrdinalIgnoreCase);
+        set.UnionWith(BinanceService.TrackedSymbols);
+        return set;
+    }
+
+    /// <summary>
+    /// Maps a model-suggested ticker to a real one: "COMB" -> "COMB.N0000", "BTC" -> "BTCUSDT".
+    /// Returns null for anything that isn't a listed CSE security or a tracked crypto pair.
+    /// </summary>
+    private static string? NormalizeTicker(string raw, HashSet<string> known)
+    {
+        var t = raw.Trim().ToUpperInvariant();
+        if (t.Length == 0) return null;
+        foreach (var candidate in new[] { t, CseSymbols.ToLookup(t), t.Replace("/", ""), t + "USDT" })
+            if (known.TryGetValue(candidate, out var match)) return match;
+        return null;
+    }
+
+    private HashSet<int> ParseAndUpdateBatch(string llmResponse, List<NewsArticle> batch, HashSet<string> knownTickers)
+    {
+        var processed = new HashSet<int>();
         try
         {
             using var doc = JsonDocument.Parse(llmResponse);
-            JsonElement root = doc.RootElement;
+            var root = doc.RootElement;
 
             if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("articles", out var arrProp))
-            {
                 root = arrProp;
-            }
 
-            if (root.ValueKind == JsonValueKind.Array)
+            // Single-article batches sometimes come back as a bare object.
+            var elements = root.ValueKind switch
             {
-                var processedIndices = new HashSet<int>();
+                JsonValueKind.Array => root.EnumerateArray().ToList(),
+                JsonValueKind.Object when root.TryGetProperty("index", out _) => new List<JsonElement> { root },
+                _ => new List<JsonElement>(),
+            };
 
-                foreach (var element in root.EnumerateArray())
+            foreach (var element in elements)
+            {
+                if (!element.TryGetProperty("index", out var idxProp) || !idxProp.TryGetInt32(out var index) || index < 0 || index >= batch.Count)
+                    continue;
+
+                var article = batch[index];
+
+                var isRelevant = !element.TryGetProperty("is_relevant", out var relProp) || relProp.ValueKind != JsonValueKind.False;
+                var cat = element.TryGetProperty("category", out var cProp) ? cProp.GetString() ?? article.MarketCategory : article.MarketCategory;
+                var sent = element.TryGetProperty("sentiment", out var sProp) ? sProp.GetString() ?? "NEUTRAL" : "NEUTRAL";
+                var imp = element.TryGetProperty("importance", out var imProp) && imProp.TryGetInt32(out var impVal) ? Math.Clamp(impVal, 1, 10) : 5;
+                var summary = element.TryGetProperty("summary", out var sumProp) ? sumProp.GetString() ?? article.Summary : article.Summary;
+                var reasoning = element.TryGetProperty("reasoning", out var rProp) ? rProp.GetString() ?? "" : "";
+
+                // Keep only tickers that are real CSE securities or tracked crypto pairs.
+                var tickers = new List<string>();
+                if (element.TryGetProperty("tickers", out var tickArray) && tickArray.ValueKind == JsonValueKind.Array)
                 {
-                    if (element.TryGetProperty("index", out var idxProp) && idxProp.TryGetInt32(out var index) && index >= 0 && index < batch.Count)
+                    foreach (var t in tickArray.EnumerateArray())
                     {
-                        var article = batch[index];
-                        processedIndices.Add(index);
-
-                        var isRelevant = !element.TryGetProperty("is_relevant", out var relProp) || relProp.GetBoolean();
-                        var cat = element.TryGetProperty("category", out var cProp) ? cProp.GetString() ?? article.MarketCategory : article.MarketCategory;
-                        var sent = element.TryGetProperty("sentiment", out var sProp) ? sProp.GetString() ?? "NEUTRAL" : "NEUTRAL";
-                        var imp = element.TryGetProperty("importance", out var imProp) && imProp.TryGetInt32(out var impVal) ? impVal : 5;
-                        var summary = element.TryGetProperty("summary", out var sumProp) ? sumProp.GetString() ?? article.Summary : article.Summary;
-                        var reasoning = element.TryGetProperty("reasoning", out var rProp) ? rProp.GetString() ?? "" : "";
-
-                        var tickers = new List<string>();
-                        if (element.TryGetProperty("tickers", out var tickArray) && tickArray.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var t in tickArray.EnumerateArray())
-                            {
-                                if (t.ValueKind == JsonValueKind.String) tickers.Add(t.GetString()!);
-                            }
-                        }
-
-                        article.IsRelevant = isRelevant;
-                        article.MarketCategory = string.IsNullOrWhiteSpace(cat) ? article.MarketCategory : cat.ToUpperInvariant();
-                        article.Sentiment = sent.ToUpperInvariant();
-                        article.ImportanceScore = imp;
-                        if (!string.IsNullOrWhiteSpace(summary)) article.Summary = summary;
-                        if (!string.IsNullOrWhiteSpace(reasoning)) article.ValidationReasoning = reasoning;
-                        else article.ValidationReasoning = $"Classified as {sent} for {cat} based on article headline and summary signals.";
-                        if (tickers.Any()) article.MentionedTickersJson = JsonSerializer.Serialize(tickers);
-                        article.IsModelValidated = true;
+                        if (t.ValueKind == JsonValueKind.String && NormalizeTicker(t.GetString()!, knownTickers) is { } valid && !tickers.Contains(valid))
+                            tickers.Add(valid);
                     }
                 }
 
-                // Any unprocessed items in batch get marked as validated with default values
-                for (int i = 0; i < batch.Count; i++)
-                {
-                    if (!processedIndices.Contains(i))
-                    {
-                        batch[i].IsModelValidated = true;
-                    }
-                }
-                return;
+                article.IsRelevant = isRelevant;
+                article.MarketCategory = string.IsNullOrWhiteSpace(cat) ? article.MarketCategory : cat.ToUpperInvariant();
+                article.Sentiment = sent.ToUpperInvariant();
+                article.ImportanceScore = imp;
+                if (!string.IsNullOrWhiteSpace(summary)) article.Summary = summary;
+                article.ValidationReasoning = !string.IsNullOrWhiteSpace(reasoning)
+                    ? reasoning
+                    : $"Classified as {sent} for {cat} based on article headline and summary signals.";
+                article.MentionedTickersJson = JsonSerializer.Serialize(tickers);
+                article.IsModelValidated = true;
+                processed.Add(article.Id);
             }
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
             _logger.LogWarning(ex, "Failed to parse Ollama validation response JSON.");
         }
 
-        MarkBatchAsValidatedWithFallback(batch);
-    }
-
-    private static void MarkBatchAsValidatedWithFallback(List<NewsArticle> batch)
-    {
-        foreach (var article in batch)
-        {
-            article.IsModelValidated = true;
-        }
+        return processed;
     }
 }

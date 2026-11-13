@@ -1,3 +1,4 @@
+using System.Text.Json;
 using dotnetApp.Application.Services;
 using dotnetApp.Application.ViewModels.Ai;
 using Microsoft.AspNetCore.Authorization;
@@ -19,11 +20,18 @@ public class AiChatApiController : ControllerBase
         _userManager = userManager;
     }
 
+    /// <summary>
+    /// Streams the assistant's reply as Server-Sent Events:
+    /// <list type="bullet">
+    /// <item><c>data: &lt;text&gt;</c> — a reply chunk; newlines are escaped as a literal backslash-n so each chunk stays on one line.</item>
+    /// <item><c>tool: {"name","status","description"}</c> — tool activity (running/completed/failed). Clients that don't know this field ignore it.</item>
+    /// </list>
+    /// </summary>
     [HttpPost("stream")]
     public async Task StreamChat([FromBody] AiChatRequestViewModel request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) 
+        if (user == null)
         {
             Response.StatusCode = 401;
             return;
@@ -33,12 +41,25 @@ public class AiChatApiController : ControllerBase
         Response.Headers.Append("Cache-Control", "no-cache");
         Response.Headers.Append("Connection", "keep-alive");
 
-        await foreach (var chunk in _aiAgentService.StreamChatAsync(request.Prompt, user.Id, HttpContext.RequestAborted))
+        var history = request.History?
+            .Select(t => new ChatTurn(t.Role, t.Content))
+            .ToList();
+
+        await foreach (var ev in _aiAgentService.StreamChatAsync(request.Prompt, history, user.Id, HttpContext.RequestAborted))
         {
-            // Format as Server-Sent Events
-            var escapedChunk = chunk.Replace("\n", "\\n"); // prevent multiline break in SSE
-            await Response.WriteAsync($"data: {escapedChunk}\n\n");
+            if (ev.Type == "tool")
+            {
+                var json = JsonSerializer.Serialize(new { name = ev.ToolName, status = ev.Status, description = ev.Description });
+                await Response.WriteAsync("tool: " + json + "\n\n");
+            }
+            else
+            {
+                var escapedChunk = (ev.Text ?? string.Empty).Replace("\n", "\\n"); // keep each chunk on one SSE line
+                await Response.WriteAsync("data: " + escapedChunk + "\n\n");
+            }
             await Response.Body.FlushAsync();
         }
+        // The reply ends when the stream closes. Current web/mobile clients also accept "data: [DONE]",
+        // but it isn't sent so that older deployed web builds (which would print it) keep working.
     }
 }
