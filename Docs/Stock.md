@@ -42,7 +42,8 @@ The stock module:
 | `GET {symbol}/history?range=1D\|1W\|1M\|3M\|1Y` | Real CSE price history, oldest first. `1D` = today's trades; other ranges are daily bars from about one year of history |
 | `GET summary` | Top 50 stocks by % change, from the database |
 | `GET intraday` | Most volatile stocks today |
-| `GET movers` | Top gainers and losers (live CSE) |
+| `GET movers` | Top 10 gainers and top 10 losers (live CSE `topGainers`/`topLooses`) |
+| `GET most-active?limit=10` | `{ byVolume, byTurnover }`: today's top stocks by share volume and by turnover, from the in-memory tradeSummary snapshot |
 | `GET indices` | ASPI and S&P SL20 (stored) |
 | `GET market-status` | Open/closed and trading day |
 | `GET names` | Symbol and name list (cached 1h) |
@@ -76,3 +77,26 @@ All are POST requests to `https://www.cse.lk/api/...`; see `mark document/CSE Re
 
 ## Trading day
 `IsTradingDay` is true on a weekday only if CSE actually opens: before 09:45 Colombo time it is assumed true, after that only if the market was reported open that day. This treats holidays correctly.
+
+## Portfolio trading desk (`/api/portfolios`)
+
+**`GET {id}` holdings** include:
+- `breakEvenPrice` (BES)
+- `previousClose`, `dayChange`, `dayChangePercent`, `dayProfitLoss`
+- `weightPercent`
+- `shareVolume`, `tradeVolume`, `turnover` (today, market-wide for that security)
+
+**The portfolio** includes `todayProfitLoss` and `todayProfitLossPercent`.
+
+**`GET {id}/insights`** (CSE portfolios only):
+- signals per holding, from ~1 year of CSE daily prices: trend vs SMA50/200, RSI14, near the 52-week high/low, volume spike
+- `upcomingDividends`: dividends with a future record date for held symbols, with `expectedPayout = qty × DPS`
+
+**Fees** (`Domain/Common/CseFees.cs`, matching ATrad). CSE charges are 1.12% on each side, and the average buy price is the raw trade price:
+- **Cost** = qty × avg × 1.0112
+- **P/L** = value × 0.9888 − cost
+- **BES** = (buy value + buy fees) / (qty × (1 − 1.12%)) = avg × 1.0112 / 0.9888
+
+P/L is exactly 0 at the BES.
+
+**Volume/turnover storage:** these are intraday values, so they are kept in memory only (`StockService.GetCachedActivity`, refreshed on each tradeSummary poll). There are no database columns and no migration.

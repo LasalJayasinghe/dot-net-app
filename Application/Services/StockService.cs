@@ -138,6 +138,19 @@ public class StockService
                 return;
             }
 
+            // Today's volume/turnover per security (intraday values, so memory-only — no DB columns).
+            _cache.Set(ActivityCacheKey,
+                stockItems.ReqTradeSummery
+                    .Where(i => !string.IsNullOrEmpty(i.Symbol))
+                    .GroupBy(i => i.Symbol, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .ToDictionary(
+                        i => i.Symbol,
+                        i => new StockActivityDto(i.Symbol, i.Name, i.Price, i.PercentageChange,
+                            i.ShareVolume, i.TradeVolume, i.Turnover),
+                        StringComparer.OrdinalIgnoreCase),
+                TimeSpan.FromDays(1));
+
             // CSE's internal ids are needed for chart history lookups.
             _cache.Set(StockIdsCacheKey,
                 stockItems.ReqTradeSummery
@@ -208,6 +221,23 @@ public class StockService
 
 
     private const string StockIdsCacheKey = "cse-stock-ids";
+    private const string ActivityCacheKey = "cse-activity";
+
+    /// <summary>
+    /// Today's volume/turnover per symbol from the last tradeSummary poll (AlertJob refreshes it every
+    /// 2 min while the market is open). Returns null if nothing has been fetched yet — never calls CSE.
+    /// </summary>
+    public IReadOnlyDictionary<string, StockActivityDto>? GetCachedActivity() =>
+        _cache.TryGetValue(ActivityCacheKey, out Dictionary<string, StockActivityDto>? map) ? map : null;
+
+    /// <summary>Like <see cref="GetCachedActivity"/>, but fetches tradeSummary once if the cache is empty.</summary>
+    public async Task<IReadOnlyDictionary<string, StockActivityDto>> GetActivitySnapshotAsync()
+    {
+        var cached = GetCachedActivity();
+        if (cached != null) return cached;
+        await GetTradingSummaryAsync();
+        return GetCachedActivity() ?? new Dictionary<string, StockActivityDto>();
+    }
 
     /// <summary>
     /// Real price history from cse.lk (companyChartDataByStock).

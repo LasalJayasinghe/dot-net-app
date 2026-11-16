@@ -55,7 +55,22 @@ public class TradeSummaryItemDto
     public decimal ClosingPrice { get; set; }
     public decimal PercentageChange { get; set; }
     public decimal Change { get; set; }
+
+    // Today's activity (CSE field names: sharevolume, tradevolume, turnover)
+    public long ShareVolume { get; set; }
+    public long TradeVolume { get; set; }
+    public decimal Turnover { get; set; }
 }
+
+/// <summary>Today's trading activity for one CSE security, from the latest tradeSummary poll.</summary>
+public record StockActivityDto(
+    string Symbol,
+    string Name,
+    decimal Price,
+    decimal PercentageChange,
+    long ShareVolume,
+    long TradeVolume,
+    decimal Turnover);
 
 public class MarketStatusDto
 {

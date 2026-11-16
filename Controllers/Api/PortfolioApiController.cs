@@ -20,7 +20,8 @@ namespace dotnetApp.Controllers.Api;
 ///   DELETE /api/portfolios/{id}/holdings/{hId}   — Remove a specific holding
 ///   GET    /api/portfolios/net-worth             — Aggregated net worth across all portfolios in display currency
 ///   GET    /api/portfolios/history               — Hourly value-over-time series (net worth, or one portfolio)
-///   POST   /api/portfolios/{id}/sync-pdf         — Sync portfolio holdings from PDF
+///   GET    /api/portfolios/{id}/insights         — Signals per holding + upcoming dividends (stocks)
+///   POST   /api/portfolios/{id}/sync-file        — Sync portfolio holdings from a broker PDF/Excel file
 /// </summary>
 [ApiController]
 [Route("api/portfolios")]
@@ -32,14 +33,17 @@ public class PortfolioApiController : ControllerBase
     private readonly ILogger<PortfolioApiController> _logger;
     private readonly IPortfolioFileSyncService _fileSyncService;
     private readonly PortfolioSnapshotService _snapshotService;
+    private readonly PortfolioInsightsService _insightsService;
 
     public PortfolioApiController(
         PortfolioService portfolioService,
         UserManager<ApplicationUser> userManager,
         ILogger<PortfolioApiController> logger,
         IPortfolioFileSyncService fileSyncService,
-        PortfolioSnapshotService snapshotService)
+        PortfolioSnapshotService snapshotService,
+        PortfolioInsightsService insightsService)
     {
+        _insightsService  = insightsService;
         _portfolioService = portfolioService;
         _userManager      = userManager;
         _logger           = logger;
@@ -142,6 +146,24 @@ public class PortfolioApiController : ControllerBase
 
         var detail = await _portfolioService.GetPortfolioDetailAsync(userId, id);
         return detail == null ? NotFound(new { message = "Portfolio not found." }) : Ok(detail);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/portfolios/{id}/insights
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Rule-based signals per holding (trend, RSI, 52-week range, volume spike) from real CSE daily prices,
+    /// plus announced dividends for the stocks held. Loaded separately from the detail (slower: price history).
+    /// </summary>
+    [HttpGet("{id:int}/insights")]
+    public async Task<IActionResult> GetInsights(int id)
+    {
+        var userId = _userManager.GetUserId(User);
+        if (userId == null) return Unauthorized();
+
+        var insights = await _insightsService.GetInsightsAsync(userId, id, HttpContext.RequestAborted);
+        return insights == null ? NotFound(new { message = "Portfolio not found." }) : Ok(insights);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -125,6 +125,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<TradingEngine>());
 builder.Services.AddScoped<ICryptoMarketService, CryptoMarketService>();
 builder.Services.AddScoped<IAiMarketSummaryService, AiMarketSummaryService>();
 builder.Services.AddScoped<dotnetApp.Application.Services.PortfolioService>();
+builder.Services.AddScoped<dotnetApp.Application.Services.PortfolioInsightsService>();
 
 // Hourly portfolio value snapshots (powers the portfolio-value-over-time graph)
 builder.Services.AddScoped<dotnetApp.Application.Services.PortfolioSnapshotService>();

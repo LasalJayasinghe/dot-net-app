@@ -52,6 +52,34 @@ public class StockApiController : ControllerBase
         }));
     }
 
+    /// <summary>
+    /// Today's 10 most active CSE stocks by share volume and by turnover (from the latest tradeSummary).
+    /// </summary>
+    [HttpGet("most-active")]
+    public async Task<IActionResult> GetMostActive([FromQuery] int limit = 10)
+    {
+        limit = Math.Clamp(limit, 1, 50);
+        var activity = await _stockService.GetActivitySnapshotAsync();
+        var traded = activity.Values.Where(a => a.ShareVolume > 0).ToList();
+
+        object Row(StockActivityDto a) => new
+        {
+            symbol = a.Symbol,
+            name = a.Name,
+            price = a.Price,
+            changePercentage = a.PercentageChange,
+            shareVolume = a.ShareVolume,
+            tradeVolume = a.TradeVolume,
+            turnover = a.Turnover,
+        };
+
+        return Ok(new
+        {
+            byVolume = traded.OrderByDescending(a => a.ShareVolume).Take(limit).Select(Row),
+            byTurnover = traded.OrderByDescending(a => a.Turnover).Take(limit).Select(Row),
+        });
+    }
+
     [HttpGet("intraday")]
     public async Task<IActionResult> GetIntradayData()
     {
