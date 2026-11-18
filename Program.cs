@@ -90,6 +90,7 @@ builder.Services.AddScoped<StockRepository>();
 builder.Services.AddScoped<AlertRepository>();
 builder.Services.AddScoped<ProfileRepository>();
 // builder.Services.AddScoped<AppDbContext>();
+builder.Services.AddScoped<dotnetApp.Application.Services.MarketPriceResolver>();
 builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IPortfolioFileSyncService, PortfolioFileSyncService>();
@@ -102,22 +103,15 @@ builder.Services.AddSingleton<BinanceService>();
 
 // Paper-trading engine: every ITradingStrategy below runs as its own bot ($1,000 paper account each,
 // Binance fee on both sides). State: PaperTrading/{id}.json. Config: PaperTrading__FeeRate, PaperTrading__InitialBalance.
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.EmaRsiStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.MacdStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.DonchianBreakoutStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.SupertrendStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.EmaCrossStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.BollingerReversionStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.RsiReversionStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.VwapReversionStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.BollingerSqueezeStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.MomentumRotationStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.EthBtcPairsStrategy>();
+// The set below follows the 2-/6-year backtest research (Docs/trading-engine.md → "Retired strategies"):
+// the 12 bots that had no edge after fees are no longer registered; their classes stay for reference/backtests.
+builder.Services.AddSingleton<ITradingStrategy>(_ => new dotnetApp.Application.Trading.Strategies.TrendRotationStrategy(
+    dotnetApp.Application.Trading.Strategies.TrendRotationSettings.Balanced));
+builder.Services.AddSingleton<ITradingStrategy>(_ => new dotnetApp.Application.Trading.Strategies.TrendRotationStrategy(
+    dotnetApp.Application.Trading.Strategies.TrendRotationSettings.Calm));
+builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.EmaTrendCrossStrategy>();
 builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.DcaStrategy>();
 builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.GridStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.OrderBookImbalanceStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.WhaleFollowStrategy>();
-builder.Services.AddSingleton<ITradingStrategy, dotnetApp.Application.Trading.Strategies.FundingContrarianStrategy>();
 builder.Services.AddSingleton<TradingEngine>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<TradingEngine>());
 

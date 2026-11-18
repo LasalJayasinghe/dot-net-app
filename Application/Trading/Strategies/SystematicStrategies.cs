@@ -5,21 +5,25 @@ using dotnetApp.Application.Trading.Market;
 
 namespace dotnetApp.Application.Trading.Strategies;
 
-/// <summary>Dollar-cost averaging: buy $25 of BTC every 24h, $50 when price is 5%+ below its 200-hour average. Never sells.</summary>
+/// <summary>
+/// Dollar-cost averaging benchmark: spreads the starting balance over ~2 years of weekly BTC buys
+/// (balance ÷ 104 each week, double when price is 5%+ below its 200-hour average). Never sells.
+/// The old $25/day sizing spent a $1,000 account in ~40 days, which made it a late buy &amp; hold.
+/// </summary>
 public sealed class DcaStrategy : TradingStrategyBase
 {
     private const string Sym = "BTCUSDT";
-    private const decimal BaseAmount = 25m;
-    private const decimal DipAmount = 50m;
+    private const int PlannedBuys = 104;          // weekly for ~2 years
+    private const decimal DipMultiplier = 2m;
     private const decimal DipThreshold = 0.05m;
-    private static readonly TimeSpan Every = TimeSpan.FromHours(24);
+    private static readonly TimeSpan Every = TimeSpan.FromDays(7);
 
     private readonly Sma _sma = new(200);
     private DateTime? _lastBuy;
 
     public override string Id => "dca-btc";
     public override string Name => "DCA BTC";
-    public override string Description => "Buys $25 of BTC every 24 hours, or $50 when price is 5%+ below its 200-hour average. Accumulates; never sells.";
+    public override string Description => "Buys BTC once a week with 1/104 of the starting balance (~2 years of buys), double that when price is 5%+ below its 200-hour average. Accumulates; never sells.";
     public override string Category => "Systematic";
     public override string Pair => "BTC/USDT";
     public override string Timeframe => "1h";
@@ -33,8 +37,9 @@ public sealed class DcaStrategy : TradingStrategyBase
         if (ctx.Cash < PaperAccount.MinNotional) return;
 
         var dip = _sma.IsReady && c.Close < _sma.Value * (1 - DipThreshold);
-        var amount = dip ? DipAmount : BaseAmount;
-        var reason = dip ? $"Scheduled buy ×2 (price {(1 - c.Close / _sma.Value) * 100:0.0}% below 200h avg)" : "Scheduled daily buy";
+        var baseAmount = Math.Max(PaperAccount.MinNotional * 1.1m, ctx.InitialBalance / PlannedBuys);
+        var amount = Math.Min(ctx.Cash, dip ? baseAmount * DipMultiplier : baseAmount);
+        var reason = dip ? $"Weekly buy ×2 (price {(1 - c.Close / _sma.Value) * 100:0.0}% below 200h avg)" : "Weekly buy";
 
         if (ctx.Buy(Sym, c.Close, amount, reason) is not null)
         {

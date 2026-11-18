@@ -36,6 +36,8 @@ public class HoldingDto
     public string AssetType { get; set; } = null!;    // "Stock" or "Crypto"
     public decimal Quantity { get; set; }
     public decimal AverageBuyPrice { get; set; }
+    /// <summary>Cost per share incl. the 1.12% buy fee: AverageBuyPrice × 1.0112. Null for crypto.</summary>
+    public decimal? CostPerShare { get; set; }
     /// <summary>
     /// Break-even selling price (ATrad formula): (buy value + 1.12% buy fees) / (qty × (1 − 1.12% sell fees)).
     /// Null for crypto.

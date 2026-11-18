@@ -41,7 +41,7 @@ public class WatchlistApiController : ControllerBase
         var stored = await _dbContext.Stocks
             .AsNoTracking()
             .Where(s => lookups.Contains(s.Symbol))
-            .Select(s => new { s.Symbol, s.Price, s.PercentageChange })
+            .Select(s => new { s.Symbol, s.Price, s.PercentageChange, s.High, s.Low })
             .ToDictionaryAsync(s => s.Symbol);
 
         // Sequential on purpose: StockService shares this request's DbContext, which isn't thread-safe.
@@ -54,7 +54,14 @@ public class WatchlistApiController : ControllerBase
         {
             if (stored.TryGetValue(lookup, out var s))
             {
-                results.Add(new { symbol = s.Symbol, price = s.Price, changePct = s.PercentageChange });
+                results.Add(new
+                {
+                    symbol = s.Symbol,
+                    price = s.Price,
+                    changePct = s.PercentageChange,
+                    high = s.High,
+                    low = s.Low,
+                });
                 continue;
             }
 
@@ -65,6 +72,8 @@ public class WatchlistApiController : ControllerBase
                 symbol = data.ReqSymbolInfo.Symbol,
                 price = data.ReqSymbolInfo.LastTradedPrice,
                 changePct = data.ReqSymbolInfo.PercentageChange,
+                high = data.ReqSymbolInfo.High,
+                low = data.ReqSymbolInfo.Low,
             });
         }
 
@@ -103,6 +112,8 @@ public class WatchlistApiController : ControllerBase
             symbol = data.ReqSymbolInfo.Symbol,
             price = data.ReqSymbolInfo.LastTradedPrice,
             changePct = data.ReqSymbolInfo.PercentageChange,
+            high = data.ReqSymbolInfo.High,
+            low = data.ReqSymbolInfo.Low,
         });
     }
 
