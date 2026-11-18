@@ -188,3 +188,40 @@ public sealed class EmaCrossStrategy : TradingStrategyBase
         ["EMA9"] = Round(_fast.Value, 2), ["EMA21"] = Round(_slow.Value, 2),
     };
 }
+
+/// <summary>
+/// Slow EMA 50/200 trend filter on BTC 4h: long while EMA50 is above EMA200, cash otherwise.
+/// Replaces the 1h EMA 9/21 bot, which was whipsawed (−73% over 2 years in backtest). The 4h 50/200 version
+/// beat buy &amp; hold on all 6 coins tested with ~12 trades in 2 years.
+/// </summary>
+public sealed class EmaTrendCrossStrategy : TradingStrategyBase
+{
+    private const string Sym = "BTCUSDT";
+    private readonly Ema _fast = new(50), _slow = new(200);
+
+    public override string Id => "ema-cross-btc-4h";
+    public override string Name => "EMA 50/200 Trend BTC";
+    public override string Description => "Holds BTC while EMA50 is above EMA200 on 4h candles; sells when it drops below.";
+    public override string Category => "Trend";
+    public override string Pair => "BTC/USDT";
+    public override string Timeframe => "4h";
+    public override StrategyFeeds Feeds { get; } = new() { Candles = [new(Sym, "4h")], WarmupCandles = 1000 };
+
+    public override void OnCandle(Candle c, string interval, StrategyContext ctx)
+    {
+        _fast.Update(c.Close);
+        _slow.Update(c.Close);
+        if (ctx.IsWarmup || !_slow.IsReady) return;
+
+        if (!ctx.HasPosition(Sym) && _fast.Value > _slow.Value)
+            ctx.BuyAll(Sym, c.Close, "EMA50 above EMA200 (uptrend)");
+        else if (ctx.HasPosition(Sym) && _fast.Value < _slow.Value)
+            ctx.SellAll(Sym, c.Close, "EMA50 below EMA200 (trend ended)");
+    }
+
+    public override IReadOnlyDictionary<string, decimal> Indicators() => new Dictionary<string, decimal>
+    {
+        ["EMA50"] = Round(_fast.Value, 2), ["EMA200"] = Round(_slow.Value, 2),
+        ["Gap%"] = _slow.Value == 0 ? 0 : Round((_fast.Value / _slow.Value - 1) * 100, 2),
+    };
+}

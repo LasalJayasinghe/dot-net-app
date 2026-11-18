@@ -42,7 +42,7 @@ Other:
 - **Notifications and auth:** `AlertService`, `TelegramService`, `PushNotificationService` (Expo), `BrevoEmailService`, `TokenService`
 
 ### Paper-trading engine (`Application/Trading`)
-- **Engine:** `TradingEngine` (hosted service) runs 16 strategies as independent paper bots on public Binance data. See `Docs/trading-engine.md`.
+- **Engine:** `TradingEngine` (hosted service) runs 5 paper bots (2 Trend Rotation multi-coin bots, EMA 50/200, DCA, grid) on public Binance data; 14 older strategies are retired after backtesting. See `Docs/trading-engine.md`.
 
 ### Background workers (`Jobs`)
 - `AlertJob`, `CseDividendJob`, `ExchangeRateJob`, `NewsIngestionJob`, `NewsValidationJob`, `PortfolioSnapshotJob`
