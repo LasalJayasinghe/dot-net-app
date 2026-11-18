@@ -1,3 +1,4 @@
+using dotnetApp.Application.Services;
 using dotnetApp.Application.ViewModels.Alerts;
 using dotnetApp.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -14,13 +15,16 @@ public class AlertApiController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly AppDbContext _dbContext;
+    private readonly MarketPriceResolver _prices;
 
     public AlertApiController(
         UserManager<ApplicationUser> userManager,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        MarketPriceResolver prices)
     {
         _userManager = userManager;
         _dbContext = dbContext;
+        _prices = prices;
     }
 
     private static object ToDto(Alert alert, decimal? currentPrice = null)
@@ -33,20 +37,16 @@ public class AlertApiController : ControllerBase
             currentPrice,
             isAbove = alert.IsAbove,
             isActive = alert.IsActive,
-            createdAt = alert.CreatedAt
+            createdAt = alert.CreatedAt,
+            // "Stock" | "Index" | "Crypto" | "Fx" (index/crypto/FX symbols: ASPI, SNPSL20, BTCUSDT, SOLUSDT, USDTLKR)
+            assetType = MarketPriceResolver.AssetTypeOf(alert.Symbol).ToString(),
+            label = MarketPriceResolver.LabelOf(alert.Symbol),
         };
     }
 
-    private async Task<Dictionary<string, decimal>> GetCurrentPricesAsync(IEnumerable<string> symbols)
-    {
-        var distinct = symbols.Distinct().ToList();
-        if (distinct.Count == 0) return new Dictionary<string, decimal>();
-
-        return await _dbContext.Stocks
-            .AsNoTracking()
-            .Where(s => distinct.Contains(s.Symbol))
-            .ToDictionaryAsync(s => s.Symbol, s => s.Price);
-    }
+    /// <summary>Current prices for stocks, indices, crypto and USDT/LKR.</summary>
+    private Task<Dictionary<string, decimal>> GetCurrentPricesAsync(IEnumerable<string> symbols) =>
+        _prices.GetPricesAsync(symbols, HttpContext.RequestAborted);
 
     private async Task<decimal?> GetCurrentPriceAsync(string symbol)
     {
@@ -79,9 +79,19 @@ public class AlertApiController : ControllerBase
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
 
+        if (string.IsNullOrWhiteSpace(vm.Symbol))
+            return BadRequest(new { message = "Symbol is required." });
+        if (vm.TargetPrice <= 0)
+            return BadRequest(new { message = "Target price must be greater than 0." });
+
+        // CSE codes are normalised ("COMB" -> "COMB.N0000") so the alert matches stored prices.
+        var symbol = MarketPriceResolver.Normalize(vm.Symbol);
+        if (!await _prices.IsSupportedAsync(symbol, HttpContext.RequestAborted))
+            return BadRequest(new { message = $"Unknown symbol '{vm.Symbol}'." });
+
         var alert = new Alert
         {
-            Symbol = vm.Symbol,
+            Symbol = symbol,
             TargetPrice = vm.TargetPrice,
             IsAbove = vm.IsAbove,
             IsActive = vm.IsActive,
@@ -111,6 +121,9 @@ public class AlertApiController : ControllerBase
 
         if (alert == null)
             return NotFound();
+
+        if (vm.TargetPrice <= 0)
+            return BadRequest(new { message = "Target price must be greater than 0." });
 
         alert.TargetPrice = vm.TargetPrice;
         alert.IsAbove = vm.IsAbove;

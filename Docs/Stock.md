@@ -95,8 +95,24 @@ All are POST requests to `https://www.cse.lk/api/...`; see `mark document/CSE Re
 **Fees** (`Domain/Common/CseFees.cs`, matching ATrad). CSE charges are 1.12% on each side, and the average buy price is the raw trade price:
 - **Cost** = qty × avg × 1.0112
 - **P/L** = value × 0.9888 − cost
+- **Cost/share** = avg × 1.0112: what you paid per share, including the buy fee. Selling at this price still loses the 1.12% sell fee.
 - **BES** = (buy value + buy fees) / (qty × (1 − 1.12%)) = avg × 1.0112 / 0.9888
 
-P/L is exactly 0 at the BES.
+P/L is exactly 0 at the BES. Example: avg 100 → Cost/share 101.12, BES 102.27.
 
 **Volume/turnover storage:** these are intraday values, so they are kept in memory only (`StockService.GetCachedActivity`, refreshed on each tradeSummary poll). There are no database columns and no migration.
+
+## Price alerts on indices, crypto and FX (`/api/alerts`)
+Besides CSE stocks, alerts accept these symbols (no dot, so they can't clash with CSE codes). `MarketPriceResolver` prices them:
+
+| Symbol | What | Price source | Checked |
+|---|---|---|---|
+| `ASPI` | ASPI index | `CseMarketIndices` (5 min while open) | every 2 min, 24/7 |
+| `SNPSL20` | S&P SL20 index | `CseMarketIndices` | every 2 min, 24/7 |
+| `BTCUSDT`, `SOLUSDT` | Binance price in USDT | live WebSocket ticker | every 2 min, 24/7 |
+| `USDTLKR` | USDT→LKR rate | Binance P2P (`ExchangeRateJob`, hourly) | every 2 min, 24/7 |
+
+- **CSE stock alerts** keep the CSE schedule: every 2 min while the market is open, hourly when closed.
+- **POST validation:** the symbol must be supported, and CSE codes are normalised (`COMB` → `COMB.N0000`). The target price must be > 0.
+- **Re-firing:** alerts stay active and re-notify while the condition holds (intended).
+- **Push type:** market alerts send `type = "market-alert"`, so the mobile app doesn't open a stock page for them.

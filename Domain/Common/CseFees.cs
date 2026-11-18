@@ -12,6 +12,12 @@ public static class CseFees
     /// <summary>Charges on a sale, as a fraction (1.12%).</summary>
     public const decimal SellRate = 0.0112m;
 
+    /// <summary>
+    /// Cost per share including the buy charges: avg × (1 + BuyRate). This is what you actually paid per
+    /// share — selling at this price still loses the sell charges (see <see cref="BreakEvenPrice"/>).
+    /// </summary>
+    public static decimal CostPerShare(decimal averageBuyPrice) => averageBuyPrice * (1 + BuyRate);
+
     /// <summary>Total cost of a purchase including buy charges.</summary>
     public static decimal CostWithBuyFees(decimal grossBuyValue) => grossBuyValue * (1 + BuyRate);
 
@@ -24,5 +30,5 @@ public static class CseFees
     /// Selling at this price returns exactly the total cost after all charges.
     /// </summary>
     public static decimal BreakEvenPrice(decimal averageBuyPrice) =>
-        CostWithBuyFees(averageBuyPrice) / (1 - SellRate);
+        CostPerShare(averageBuyPrice) / (1 - SellRate);
 }

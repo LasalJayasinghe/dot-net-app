@@ -378,6 +378,7 @@ public class PortfolioService
             AssetType           = h.AssetType.ToString(),
             Quantity            = h.Quantity,
             AverageBuyPrice     = h.AverageBuyPrice,
+            CostPerShare        = isStock ? Math.Round(CseFees.CostPerShare(h.AverageBuyPrice), 4) : null,
             BreakEvenPrice      = isStock ? Math.Round(CseFees.BreakEvenPrice(h.AverageBuyPrice), 4) : null,
             CurrentPrice        = currentPrice,
             PreviousClose       = prevClose,

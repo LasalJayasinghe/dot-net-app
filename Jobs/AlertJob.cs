@@ -11,6 +11,9 @@ public class AlertJob : BackgroundService
     private static readonly TimeSpan ClosedStatusInterval = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan ClosedDataInterval = TimeSpan.FromMinutes(60);
 
+    // Index / crypto / USDT-LKR alerts run 24/7 (crypto never closes) at the same 2-minute cadence.
+    private static readonly TimeSpan MarketAlertInterval = TimeSpan.FromMinutes(2);
+
     private readonly IServiceScopeFactory _scopeFactory;
 
     public AlertJob(IServiceScopeFactory scopeFactory)
@@ -24,6 +27,7 @@ public class AlertJob : BackgroundService
         var lastStatusCheck = DateTime.MinValue;
         var lastIndexUpdate = DateTime.MinValue;
         var lastPriceUpdate = DateTime.MinValue;
+        var lastMarketAlertCheck = DateTime.MinValue;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -58,8 +62,15 @@ public class AlertJob : BackgroundService
                 if (now - lastPriceUpdate >= (isOpen ? OpenPriceInterval : ClosedDataInterval))
                 {
                     await stockService.GetTradingSummaryAsync();
-                    await alertService.MonitorAlertsAsync(stoppingToken);
+                    await alertService.MonitorAlertsAsync(AlertScope.Cse, stoppingToken);
                     lastPriceUpdate = now;
+                }
+
+                // Indices are refreshed above; crypto comes from the live Binance feed.
+                if (now - lastMarketAlertCheck >= MarketAlertInterval)
+                {
+                    await alertService.MonitorAlertsAsync(AlertScope.Markets, stoppingToken);
+                    lastMarketAlertCheck = now;
                 }
             }
             catch (Exception ex)

@@ -90,6 +90,7 @@ builder.Services.AddScoped<StockRepository>();
 builder.Services.AddScoped<AlertRepository>();
 builder.Services.AddScoped<ProfileRepository>();
 // builder.Services.AddScoped<AppDbContext>();
+builder.Services.AddScoped<dotnetApp.Application.Services.MarketPriceResolver>();
 builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IPortfolioFileSyncService, PortfolioFileSyncService>();

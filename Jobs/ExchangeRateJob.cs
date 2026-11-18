@@ -40,8 +40,8 @@ public class ExchangeRateJob : BackgroundService
                 _logger.LogError(ex, "Error executing ExchangeRateJob");
             }
 
-            // Sync once a day (every 24 hours)
-            await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
+            // Hourly, so USDT/LKR price alerts are never more than an hour behind the P2P market.
+            await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
         }
     }
 }

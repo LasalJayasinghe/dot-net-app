@@ -1,107 +1,110 @@
 using dotnetApp;
 using dotnetApp.Application.Interface;
+using dotnetApp.Application.Services;
 using dotnetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+
+/// <summary>Which alerts a monitoring pass covers.</summary>
+public enum AlertScope
+{
+    /// <summary>CSE stocks — checked on the CSE price schedule (every 2 min while open).</summary>
+    Cse,
+    /// <summary>Indices, crypto and USDT/LKR — checked every 2 min, 24/7.</summary>
+    Markets,
+}
 
 public class AlertService
 {
     private readonly AppDbContext _dbContext;
-    private readonly StockService _stockService;
+    private readonly MarketPriceResolver _prices;
     private readonly TelegramService _telegramService;
     private readonly IPushNotificationService _pushService;
 
     public AlertService(
         AppDbContext _db,
-        StockService stockService,
+        MarketPriceResolver prices,
         TelegramService telegramService,
         IPushNotificationService pushService)
     {
         _dbContext = _db;
-        _stockService = stockService;
+        _prices = prices;
         _telegramService = telegramService;
         _pushService = pushService;
     }
 
-    public async Task MonitorAlertsAsync(CancellationToken stoppingToken)
+    /// <summary>
+    /// Sends Telegram + push for every active alert whose condition holds. Alerts stay active, so an alert
+    /// keeps notifying on each pass while the condition holds (intended behaviour).
+    /// </summary>
+    public async Task MonitorAlertsAsync(AlertScope scope, CancellationToken stoppingToken)
     {
-        Console.WriteLine("Monitoring alerts...");
-        var alerts = await _dbContext.Alerts
-            .Where(alert => alert.IsActive)
-            .ToListAsync(stoppingToken);
+        var alerts = (await _dbContext.Alerts
+                .AsNoTracking()
+                .Where(alert => alert.IsActive)
+                .ToListAsync(stoppingToken))
+            .Where(a => MarketPriceResolver.IsMarketSymbol(a.Symbol) == (scope == AlertScope.Markets))
+            .ToList();
 
-        if (!alerts.Any()) return;
+        if (alerts.Count == 0) return;
 
-        var symbols = alerts.Select(a => a.Symbol).Distinct().ToList();
+        var prices = await _prices.GetPricesAsync(alerts.Select(a => a.Symbol), stoppingToken);
         var userIds = alerts.Select(a => a.CreatedBy).Distinct().ToList();
-
-        var stocks = await _dbContext.Stocks
-            .Where(s => symbols.Contains(s.Symbol))
-            .ToDictionaryAsync(s => s.Symbol, stoppingToken);
 
         var profiles = await _dbContext.Profiles
             .AsNoTracking()
             .Where(p => userIds.Contains(p.UserId))
             .ToDictionaryAsync(p => p.UserId, stoppingToken);
 
-        bool hasChanges = false;
-
         foreach (var alert in alerts)
         {
-            if (!stocks.TryGetValue(alert.Symbol, out var existingStock))
+            if (!prices.TryGetValue(alert.Symbol, out var price))
             {
-                Console.WriteLine($"Stock data for {alert.Symbol} not found.");
+                Console.WriteLine($"Price for alert symbol {alert.Symbol} not available.");
                 continue;
             }
 
-            var alertPriceCondition = alert.IsAbove ? existingStock.Price >= alert.TargetPrice : existingStock.Price <= alert.TargetPrice;
-            if (alertPriceCondition)
+            var triggered = alert.IsAbove ? price >= alert.TargetPrice : price <= alert.TargetPrice;
+            if (!triggered) continue;
+
+            try
             {
-                try
-                {
-                    var message = $"Alert: {alert.Symbol} has reached the target price of {alert.TargetPrice:N2}. Current price: {existingStock.Price:N2}";
+                var label = MarketPriceResolver.LabelOf(alert.Symbol);
+                var target = MarketPriceResolver.FormatPrice(alert.Symbol, alert.TargetPrice);
+                var now = MarketPriceResolver.FormatPrice(alert.Symbol, price);
+                var message = $"Alert: {label} has reached the target of {target}. Current: {now}";
 
-                    if (profiles.TryGetValue(alert.CreatedBy, out var userProfile) && 
-                        long.TryParse(userProfile.TelegramId, out long userChatId) && 
-                        userChatId != 0)
+                if (profiles.TryGetValue(alert.CreatedBy, out var userProfile) &&
+                    long.TryParse(userProfile.TelegramId, out long userChatId) &&
+                    userChatId != 0)
+                {
+                    await _telegramService.SendMessageAsync(userChatId, message);
+                }
+
+                // The phone gets the same alert. Unlike Telegram this needs no linked account.
+                // Stock alerts use type "price-alert" (the mobile app deep-links to the stock page);
+                // index/crypto/FX alerts use "market-alert" so the app doesn't open a stock page for them.
+                var isStock = !MarketPriceResolver.IsMarketSymbol(alert.Symbol);
+                await _pushService.SendToUserAsync(
+                    alert.CreatedBy,
+                    $"{label} hit {target}",
+                    $"Now at {now}. Your {(alert.IsAbove ? "above" : "below")} alert has triggered.",
+                    new Dictionary<string, object?>
                     {
-                        await _telegramService.SendMessageAsync(userChatId, message);
-                    }
+                        ["type"] = isStock ? "price-alert" : "market-alert",
+                        ["alertId"] = alert.Id,
+                        ["symbol"] = alert.Symbol,
+                        ["assetType"] = MarketPriceResolver.AssetTypeOf(alert.Symbol).ToString(),
+                        ["price"] = price,
+                        ["targetPrice"] = alert.TargetPrice,
+                    },
+                    stoppingToken);
 
-                    // The phone gets the same alert. Unlike Telegram this needs no
-                    // linked account - it reaches whatever devices are signed in,
-                    // and does nothing when the user has none.
-                    await _pushService.SendToUserAsync(
-                        alert.CreatedBy,
-                        $"{alert.Symbol} hit {alert.TargetPrice:N2}",
-                        $"Now trading at {existingStock.Price:N2}. Your {(alert.IsAbove ? "above" : "below")} alert has triggered.",
-                        new Dictionary<string, object?>
-                        {
-                            // Read by the app when the notification is tapped, to
-                            // deep-link straight to the symbol.
-                            ["type"] = "price-alert",
-                            ["alertId"] = alert.Id,
-                            ["symbol"] = alert.Symbol,
-                            ["price"] = existingStock.Price,
-                            ["targetPrice"] = alert.TargetPrice,
-                        },
-                        stoppingToken);
-
-                    // alert.IsActive = false;
-                    _dbContext.Alerts.Update(alert);
-                    hasChanges = true;
-
-                    Console.WriteLine($"Alert triggered for {alert.Symbol} at price {existingStock.Price:N2}.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error sending alert for {alert.Symbol}: {ex.Message}");
-                }
+                Console.WriteLine($"Alert triggered for {alert.Symbol} at {now}.");
             }
-        }
-
-        if (hasChanges)
-        {
-            await _dbContext.SaveChangesAsync(stoppingToken);
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error sending alert for {alert.Symbol}: {ex.Message}");
+            }
         }
     }
 }
