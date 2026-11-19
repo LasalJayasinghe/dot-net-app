@@ -34,6 +34,13 @@ Every executed side pays `PaperTrading__FeeRate` (default 0.001 = 0.10%, Binance
 - **Average cost:** used by default. The grid bot sells specific lots instead.
 - **Equity / unrealized P/L:** open positions are valued as if sold now, after the exit fee.
 
+## Benchmark: holding BTC
+
+Every bot is compared with simply buying BTC with its starting balance on the day it started and holding it.
+- **Start price:** `BotState.BenchmarkBtcPrice` is the BTC/USDT price at `CreatedAt`. The engine records it once after warm-up. For bots that already existed, it takes the open of the Binance 1-minute candle at their start time. A failed lookup retries on the next restart.
+- **API fields** (list and detail): `startedAt`, `btcStartPrice`, `btcPrice`, `btcHoldValue`, `btcHoldPnlPct`, `vsBtc` (equity − BTC-hold value, USDT) and `vsBtcPct` (the same, in % points of the starting balance).
+- **Fees:** the BTC-hold value pays the buy fee and deducts the exit fee, the same way equity is valued, so the two numbers are directly comparable.
+
 ## Strategies
 
 The current set comes from a 2-year and a 6-year backtest on real Binance data (fees + slippage included). The

@@ -44,6 +44,7 @@ public class AlgorithmsApiController : ControllerBase
                 s.id, s.name, s.description, s.category, s.pair, s.timeframe, s.status,
                 s.totalPnl, s.totalPnlPct, s.winRate, s.activeSignals, s.totalTrades, s.currentSignal, s.lastUpdated,
                 s.totalFees, s.feeRate, s.realizedPnl, s.unrealizedPnl, s.equity, s.cash, s.initialBalance,
+                s.startedAt, s.btcStartPrice, s.btcPrice, s.btcHoldValue, s.btcHoldPnlPct, s.vsBtc, s.vsBtcPct,
                 indicators = strategy.Indicators(),
                 signals = BuildSignals(state),
                 trade = BuildOpenTrade(state, strategy, fee),
@@ -73,7 +74,9 @@ public class AlgorithmsApiController : ControllerBase
         decimal totalPnl, decimal totalPnlPct, decimal winRate, int activeSignals, int totalTrades,
         string currentSignal, DateTime lastUpdated,
         decimal totalFees, decimal feeRate, decimal realizedPnl, decimal unrealizedPnl, decimal equity,
-        decimal cash, decimal initialBalance);
+        decimal cash, decimal initialBalance,
+        DateTime startedAt, decimal? btcStartPrice, decimal? btcPrice, decimal? btcHoldValue, decimal? btcHoldPnlPct,
+        decimal? vsBtc, decimal? vsBtcPct);
 
     private Summary BuildSummary(BotState state, ITradingStrategy strategy, decimal feeRate)
     {
@@ -90,6 +93,19 @@ public class AlgorithmsApiController : ControllerBase
         var totalPnl = equity - state.InitialBalance;
         var closed = state.Wins + state.Losses;
         var lastSignal = state.Signals.Count > 0 ? state.Signals[^1] : null;
+
+        // Benchmark: the starting balance bought into BTC at the bot's start and held, valued the same way as
+        // the bot (buy fee paid, exit fee deducted), so the two numbers are directly comparable.
+        decimal? btcNow = null, btcHoldValue = null, btcHoldPnlPct = null, vsBtc = null, vsBtcPct = null;
+        if (state.BenchmarkBtcPrice is > 0 and var btcStart && BtcPrice() is > 0 and var btcPrice)
+        {
+            btcNow = btcPrice;
+            var hold = state.InitialBalance * (1 - feeRate) / btcStart * btcPrice * (1 - feeRate);
+            btcHoldValue = Math.Round(hold, 2);
+            btcHoldPnlPct = state.InitialBalance == 0 ? 0 : Math.Round((hold - state.InitialBalance) / state.InitialBalance * 100, 2);
+            vsBtc = Math.Round(equity - hold, 2);
+            vsBtcPct = state.InitialBalance == 0 ? 0 : Math.Round((equity - hold) / state.InitialBalance * 100, 2);
+        }
 
         return new Summary(
             id: strategy.Id,
@@ -112,7 +128,14 @@ public class AlgorithmsApiController : ControllerBase
             unrealizedPnl: Math.Round(unrealized, 2),
             equity: Math.Round(equity, 2),
             cash: Math.Round(state.Cash, 2),
-            initialBalance: state.InitialBalance);
+            initialBalance: state.InitialBalance,
+            startedAt: state.CreatedAt,
+            btcStartPrice: state.BenchmarkBtcPrice,
+            btcPrice: btcNow,
+            btcHoldValue: btcHoldValue,
+            btcHoldPnlPct: btcHoldPnlPct,
+            vsBtc: vsBtc,
+            vsBtcPct: vsBtcPct);
     }
 
     private static IEnumerable<object> BuildSignals(BotState state) =>
@@ -196,6 +219,9 @@ public class AlgorithmsApiController : ControllerBase
         }
         return rows;
     }
+
+    private decimal? BtcPrice() =>
+        _binance.GetTicker("BTCUSDT") is { LastPrice: > 0 } t ? t.LastPrice : _engine.LastPrice("BTCUSDT");
 
     private decimal Price(string symbol, HoldingState h) =>
         _binance.GetTicker(symbol) is { LastPrice: > 0 } t ? t.LastPrice

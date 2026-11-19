@@ -65,6 +65,14 @@ public sealed class BotState
     public bool IsEnabled { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastEventTime { get; set; }
+
+    /// <summary>
+    /// BTC/USDT price at <see cref="CreatedAt"/>, for the "what if the starting balance had just been held
+    /// in BTC" comparison. Captured once by <see cref="TradingEngine"/> (looked up from Binance history for
+    /// bots that existed before this field).
+    /// </summary>
+    public decimal? BenchmarkBtcPrice { get; set; }
+
     public Dictionary<string, HoldingState> Holdings { get; set; } = new();
     public List<TradeRecord> Trades { get; set; } = new();
     public List<SignalRecord> Signals { get; set; } = new();

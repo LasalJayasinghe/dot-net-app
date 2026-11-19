@@ -82,6 +82,7 @@ public sealed class TradingEngine : BackgroundService
         var fundingTask = _fundingRoutes.Count > 0 ? PollFundingAsync(ct) : Task.CompletedTask;
 
         await WarmupAsync(ct);
+        await CaptureBtcBenchmarksAsync(ct);
 
         try
         {
@@ -137,6 +138,46 @@ public sealed class TradingEngine : BackgroundService
         }
 
         _logger.LogInformation("Trading engine warm-up complete: {Count} historical candles replayed.", count);
+    }
+
+    /// <summary>
+    /// Records the BTC/USDT price at each bot's start (<see cref="BotState.CreatedAt"/>) so the API can show
+    /// what the starting balance would be worth if it had simply been held in BTC. Bots created before this
+    /// existed get the price from the Binance 1-minute candle at their start time. Done once per bot; a failed
+    /// lookup is retried on the next restart.
+    /// </summary>
+    private async Task CaptureBtcBenchmarksAsync(CancellationToken ct)
+    {
+        var feed = new CandleFeed("BTCUSDT", "1m");
+        foreach (var bot in Bots)
+        {
+            var (missing, createdAt) = bot.Read((s, _, _) => (s.BenchmarkBtcPrice is null, s.CreatedAt));
+            if (!missing) continue;
+
+            try
+            {
+                var start = DateTime.SpecifyKind(createdAt, DateTimeKind.Utc);
+                var candles = await _market.GetClosedCandlesAsync(feed, 1, start, null, ct);
+                var price = candles.Count > 0
+                    ? candles[0].Open
+                    // Started within the last minute: that candle is still forming, so use the latest close.
+                    : (await _market.GetClosedCandlesAsync(feed, 2, null, null, ct)).LastOrDefault()?.Close;
+                if (price is not > 0) continue;
+
+                lock (bot.Sync)
+                {
+                    bot.Account.State.BenchmarkBtcPrice = price;
+                    bot.Save();
+                }
+                _logger.LogInformation("Bot {Bot}: BTC benchmark price {Price} at start {Start:u}.",
+                    bot.Strategy.Id, price, start);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "BTC benchmark lookup failed for bot {Bot}; will retry on restart.",
+                    bot.Strategy.Id);
+            }
+        }
     }
 
     private async Task PollFundingAsync(CancellationToken ct)
