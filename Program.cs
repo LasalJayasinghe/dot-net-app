@@ -86,6 +86,17 @@ builder.Services.AddHttpClient<StockService>(client =>
         "Origin", "https://www.cse.lk");
 });
 
+// Permanent CSE daily price history (CseHistoryJob): same cse.lk headers, longer timeout for chart pulls.
+builder.Services.AddSingleton<CseHistoryStatus>();
+builder.Services.AddHttpClient<CseHistoryService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json, text/plain, */*");
+    client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+    client.DefaultRequestHeaders.TryAddWithoutValidation("Origin", "https://www.cse.lk");
+    client.DefaultRequestHeaders.TryAddWithoutValidation("Referer", "https://www.cse.lk/");
+});
+
 builder.Services.AddScoped<StockRepository>();
 builder.Services.AddScoped<AlertRepository>();
 builder.Services.AddScoped<ProfileRepository>();
@@ -171,6 +182,7 @@ builder.Services.AddHttpClient("binance", client =>
 builder.Services.AddHostedService(sp => sp.GetRequiredService<BinanceService>());
 builder.Services.AddHostedService<AlertJob>();
 builder.Services.AddHostedService<CseDividendJob>();
+builder.Services.AddHostedService<CseHistoryJob>();
 
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("Telegram"));
 builder.Services.Configure<PushSettings>(builder.Configuration.GetSection("Push"));

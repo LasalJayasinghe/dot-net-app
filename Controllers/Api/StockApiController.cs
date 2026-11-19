@@ -1,4 +1,5 @@
 using dotnetApp.Application.Dtos;
+using dotnetApp.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +11,12 @@ namespace dotnetApp.Controllers.Api;
 public class StockApiController : ControllerBase
 {
     private readonly StockService _stockService;
+    private readonly CseHistoryService _history;
 
-    public StockApiController(StockService stockService)
+    public StockApiController(StockService stockService, CseHistoryService history)
     {
         _stockService = stockService;
+        _history = history;
     }
 
     [HttpGet("details/{symbol}")]
@@ -33,11 +36,16 @@ public class StockApiController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Real CSE price history. range = 1D | 1W | 1M | 3M | 1Y | ALL.</summary>
+    /// <summary>
+    /// Real CSE price history. range = 1D | 1W | 1M | 3M | 1Y | ALL.
+    /// Daily ranges come from our stored history (CsePriceDaily, which grows past CSE's 1-year limit)
+    /// once it covers the range; otherwise, and for 1D, from the live CSE chart.
+    /// </summary>
     [HttpGet("{symbol}/history")]
-    public async Task<IActionResult> GetHistory(string symbol, [FromQuery] string range = "1M")
+    public async Task<IActionResult> GetHistory(string symbol, [FromQuery] string range = "1M", CancellationToken ct = default)
     {
-        var points = await _stockService.GetPriceHistoryAsync(symbol, range);
+        var stored = (range ?? "").ToUpperInvariant() == "1D" ? null : await _history.GetDailyHistoryAsync(symbol, range ?? "1M", ct);
+        var points = stored ?? await _stockService.GetPriceHistoryAsync(symbol, range ?? "1M");
         if (points == null)
             return NotFound(new { message = "No price history available for this symbol." });
 

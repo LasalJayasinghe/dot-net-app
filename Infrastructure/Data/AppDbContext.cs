@@ -23,6 +23,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<NewsArticle> NewsArticles { get; set; } = null!;
     public DbSet<Dividend> Dividends { get; set; } = null!;
     public DbSet<DeviceToken> DeviceTokens { get; set; } = null!;
+    public DbSet<CsePriceDaily> CsePriceDaily { get; set; } = null!;
+    public DbSet<CseIndexDaily> CseIndexDaily { get; set; } = null!;
+    public DbSet<CseMarketDaily> CseMarketDaily { get; set; } = null!;
+    public DbSet<CseSecurity> CseSecurities { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -273,5 +277,30 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // ── CSE price history (CseHistoryJob) ───────────────────────────────
+        builder.Entity<CsePriceDaily>(entity =>
+        {
+            entity.ToTable("CsePriceDaily");
+            entity.HasIndex(p => new { p.Symbol, p.TradeDate }).IsUnique();
+            entity.HasIndex(p => p.TradeDate);
+        });
+
+        builder.Entity<CseIndexDaily>(entity =>
+        {
+            entity.ToTable("CseIndexDaily");
+            entity.HasIndex(i => new { i.IndexCode, i.TradeDate }).IsUnique();
+        });
+
+        builder.Entity<CseMarketDaily>(entity =>
+        {
+            entity.ToTable("CseMarketDaily");
+            entity.HasIndex(m => m.TradeDate).IsUnique();
+        });
+
+        builder.Entity<CseSecurity>(entity =>
+        {
+            entity.ToTable("CseSecurities");
+            entity.HasIndex(s => s.Symbol).IsUnique();
+        });
     }
 }

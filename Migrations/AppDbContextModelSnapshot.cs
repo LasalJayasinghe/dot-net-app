@@ -616,6 +616,228 @@ namespace dotnetApp.Migrations
                     b.ToTable("WatchlistItems", (string)null);
                 });
 
+            modelBuilder.Entity("dotnetApp.Domain.Entities.CseIndexDaily", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("Change")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ChangePercent")
+                        .HasColumnType("decimal(12,6)");
+
+                    b.Property<decimal>("Close")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal?>("High")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("IndexCode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<decimal?>("Low")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<DateOnly>("TradeDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IndexCode", "TradeDate")
+                        .IsUnique();
+
+                    b.ToTable("CseIndexDaily", (string)null);
+                });
+
+            modelBuilder.Entity("dotnetApp.Domain.Entities.CseMarketDaily", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("Asi")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal?>("DividendYield")
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal?>("EquityForeignPurchase")
+                        .HasColumnType("decimal(22,2)");
+
+                    b.Property<decimal?>("EquityForeignSales")
+                        .HasColumnType("decimal(22,2)");
+
+                    b.Property<int?>("ListedCompanies")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MarketCap")
+                        .HasColumnType("decimal(26,2)");
+
+                    b.Property<long?>("MarketTrades")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal?>("MarketTurnover")
+                        .HasColumnType("decimal(22,2)");
+
+                    b.Property<decimal?>("Pbv")
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal?>("Per")
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<string>("RawJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal?>("SpSl20")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateOnly>("TradeDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("TradedCompanies")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TradeDate")
+                        .IsUnique();
+
+                    b.ToTable("CseMarketDaily", (string)null);
+                });
+
+            modelBuilder.Entity("dotnetApp.Domain.Entities.CsePriceDaily", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Close")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("High")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("Low")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("MarketCap")
+                        .HasColumnType("decimal(24,2)");
+
+                    b.Property<decimal?>("Open")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("PreviousClose")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<long>("ShareVolume")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<int?>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StockId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateOnly>("TradeDate")
+                        .HasColumnType("date");
+
+                    b.Property<long?>("Trades")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal?>("Turnover")
+                        .HasColumnType("decimal(22,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TradeDate");
+
+                    b.HasIndex("Symbol", "TradeDate")
+                        .IsUnique();
+
+                    b.ToTable("CsePriceDaily", (string)null);
+                });
+
+            modelBuilder.Entity("dotnetApp.Domain.Entities.CseSecurity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("FirstSeen")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("LastSeen")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<int>("StockId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Symbol")
+                        .IsUnique();
+
+                    b.ToTable("CseSecurities", (string)null);
+                });
+
             modelBuilder.Entity("dotnetApp.Domain.Entities.DeviceToken", b =>
                 {
                     b.Property<int>("Id")
