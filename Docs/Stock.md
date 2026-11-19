@@ -19,6 +19,7 @@ The stock module:
 3. **CseDividendJob** fetches CSE dividend announcements hourly and upserts `Dividends`, plus a news article per announcement.
 4. **NewsApiController** adds `dividendPaymentDate` to dividend news articles.
 5. **AlertService** compares stored prices with user alerts and notifies through Telegram and Expo push.
+6. **CseHistoryJob** keeps a permanent daily price history in the database (see "Price history" below).
 
 ## Key files
 - `Application/Services/StockService.cs`:
@@ -28,6 +29,8 @@ The stock module:
 - `Controllers/Api/StockApiController.cs`: stock endpoints (below)
 - `Controllers/Api/WatchlistApiController.cs`: user watchlist, priced from the `Stocks` table
 - `Jobs/AlertJob.cs`, `Jobs/CseDividendJob.cs`: background polling
+- `Jobs/CseHistoryJob.cs`, `Application/Services/CseHistoryService.cs`: daily price history (backfill, daily recording, gap repair)
+- `Controllers/Api/CseHistoryAdminController.cs`: admin status / backfill / export for the history
 - `Controllers/Api/DividendsApiController.cs`, `Controllers/Api/NewsApiController.cs`
 - `Application/Dtos/StockDataDtos.cs`: CSE response DTOs
 - `Domain/Entities/CSE/Stock.cs`, `MarketStatus.cs`, `MarketIndices.cs`: entities
@@ -39,7 +42,7 @@ The stock module:
 | Endpoint | Description |
 |---|---|
 | `GET details/{symbol}` | Live CSE quote. Accepts `COMB` or `COMB.N0000` |
-| `GET {symbol}/history?range=1D\|1W\|1M\|3M\|1Y` | Real CSE price history, oldest first. `1D` = today's trades; other ranges are daily bars from about one year of history |
+| `GET {symbol}/history?range=1D\|1W\|1M\|3M\|1Y\|ALL` | Real CSE price history, oldest first. `1D` = today's trades (live). Daily ranges come from the stored history (`CsePriceDaily`) once it covers the range, otherwise from the live CSE chart. `ALL` grows past CSE's 1-year limit as history accumulates |
 | `GET summary` | Top 50 stocks by % change, from the database |
 | `GET intraday` | Most volatile stocks today |
 | `GET movers` | Top 10 gainers and top 10 losers (live CSE `topGainers`/`topLooses`) |
@@ -116,3 +119,38 @@ Besides CSE stocks, alerts accept these symbols (no dot, so they can't clash wit
 - **POST validation:** the symbol must be supported, and CSE codes are normalised (`COMB` → `COMB.N0000`). The target price must be > 0.
 - **Re-firing:** alerts stay active and re-notify while the condition holds (intended).
 - **Push type:** market alerts send `type = "market-alert"`, so the mobile app doesn't open a stock page for them.
+
+## Price history (`CsePriceDaily`)
+CSE only serves about **one year** of daily history per stock (`companyChartDataByStock`, `period=5`; larger
+periods and date parameters don't go further), no S&P SL20 history, and only 2 days of `dailyMarketSummery`.
+So the app records its own permanent history. Everything runs automatically in `CseHistoryJob`; nothing is manual.
+
+| When | What |
+|---|---|
+| App start | Table empty → **1-year backfill** from the chart API for every known security and ASPI (~3–4 min, one call per security with a 0.4 s pause). Otherwise a **2-month gap repair** |
+| Every 15 min, outside 09:15–14:40 on weekdays | **Records the latest finished session** from `tradeSummary` once its closing prices are published: open, high, low, official close, previous close, share volume, trades, turnover, market cap, status. Also the ASPI and S&P SL20 closes and the `dailyMarketSummery` row. The session date comes from CSE's own last-trade times, so holidays and repeated runs are no-ops |
+| Sundays (from 03:00) | **Gap repair**: re-pulls ~2 months from the chart API and adds missing days (e.g. while the server was down) |
+
+**Tables:**
+
+| Table | Contents |
+|---|---|
+| `CsePriceDaily` | One row per security per trading day (unique `Symbol` + `TradeDate`). `Source` = `TradeSummary` (recorded, full fields) or `Chart` (backfilled: no open, trades, turnover or market cap). A chart row never overwrites a recorded one |
+| `CseIndexDaily` | ASPI (backfilled ~1 year + recorded) and SNPSL20 (recorded from the start date only) |
+| `CseMarketDaily` | Market turnover, trades, foreign buying/selling, market cap, ASI, S&P SL20, PER, PBV, dividend yield + the raw CSE row |
+| `CseSecurities` | Every security ever seen with its CSE id, first/last seen. Rows are never deleted (no survivorship bias in later backtests) |
+
+**Limits:** backfilled days have no open (charts use the previous close); prices are **not adjusted** for splits,
+bonus or rights issues; illiquid stocks have no row on days they didn't trade.
+
+**Admin endpoints** (`/api/admin/cse-history`, Admin role):
+
+| Endpoint | Description |
+|---|---|
+| `GET status` | Row counts, first/last date, rows on the last date, index/market coverage, last run of each task |
+| `POST backfill?period=5\|4` | Re-runs the backfill (5 ≈ 1 year) or gap repair (4 ≈ 2 months) in the background. Safe to repeat. 409 if a task is running |
+| `POST record` | Records the latest finished session now |
+| `GET export?from=yyyy-MM-dd&to=yyyy-MM-dd&symbol=JKH` | CSV for backtests (all filters optional) |
+
+**Deploy:** the tables come from migration `AddCsePriceHistory`. The app does not migrate on startup, so run
+`dotnet ef database update` on the server before (or right after) deploying.
