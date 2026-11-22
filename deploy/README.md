@@ -135,7 +135,14 @@ docker compose logs -f api
 The database is empty on the first start, so the role seeder fails and `api` restarts in a loop.
 That's expected until you complete step 7.
 
-## 7. Apply EF migrations from your laptop
+## 7. Apply EF migrations
+
+**Normally you do nothing.** The API applies pending migrations itself on startup (every deploy restarts the
+container), logging `Applying N pending migration(s)` and `Migrations applied.` If one fails, the API stops
+instead of running on a half-migrated schema; read `docker compose logs api`. Set
+`Database__AutoMigrate=false` in `deploy/api.env` to turn this off and use the manual steps below.
+
+Manual route, from your laptop:
 
 MySQL listens only on the server's loopback, so open an SSH tunnel to it:
 

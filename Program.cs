@@ -389,6 +389,22 @@ using (var scope = app.Services.CreateScope())
         Console.WriteLine("❌ Database ERROR: " + ex.Message);
     }
 
+    // Apply pending EF migrations before anything touches the schema (the role seeder below, the
+    // background jobs). Deploys therefore migrate themselves. Off in Development so a local run never
+    // alters a database you didn't ask it to; force either way with Database:AutoMigrate.
+    // A failed migration stops startup on purpose: running on a half-migrated schema is worse.
+    if (app.Configuration.GetValue("Database:AutoMigrate", !app.Environment.IsDevelopment()))
+    {
+        var startupLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Migrations");
+        var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+        if (pending.Count > 0)
+        {
+            startupLogger.LogInformation("Applying {Count} pending migration(s): {Names}", pending.Count, string.Join(", ", pending));
+            await db.Database.MigrateAsync();
+            startupLogger.LogInformation("Migrations applied.");
+        }
+    }
+
     await RoleSeeder.SeedRolesAndPermissionsAsync(scope.ServiceProvider);
 }
 

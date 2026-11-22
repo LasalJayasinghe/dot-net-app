@@ -152,5 +152,5 @@ bonus or rights issues; illiquid stocks have no row on days they didn't trade.
 | `POST record` | Records the latest finished session now |
 | `GET export?from=yyyy-MM-dd&to=yyyy-MM-dd&symbol=JKH` | CSV for backtests (all filters optional) |
 
-**Deploy:** the tables come from migration `AddCsePriceHistory`. The app does not migrate on startup, so run
-`dotnet ef database update` on the server before (or right after) deploying.
+**Deploy:** the tables come from migration `AddCsePriceHistory`. The app applies pending migrations on startup
+outside Development (`Database:AutoMigrate`, default on), so a deploy creates them by itself.
