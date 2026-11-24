@@ -171,6 +171,18 @@ builder.Services.AddHostedService<NewsValidationJob>();
 builder.Services.AddHttpClient<BinanceP2pService>();
 builder.Services.AddHostedService<ExchangeRateJob>();
 
+// World markets (US, Asia, gold/silver/oil, VIX/DXY) for the dashboard — shared 5-minute cache.
+builder.Services.AddHttpClient<IGlobalMarketProvider, dotnetApp.Application.Services.MarketProviders.YahooFinanceMarketProvider>(client =>
+{
+    client.BaseAddress = new Uri("https://query1.finance.yahoo.com/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json");
+    client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+});
+builder.Services.AddSingleton<GlobalMarketStore>();
+builder.Services.AddScoped<GlobalMarketService>();
+builder.Services.AddHostedService<GlobalMarketsJob>();
+
 // Named HttpClient for Binance REST API — no API keys needed for public endpoints
 builder.Services.AddHttpClient("binance", client =>
 {
