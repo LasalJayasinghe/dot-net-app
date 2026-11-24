@@ -27,6 +27,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<CseIndexDaily> CseIndexDaily { get; set; } = null!;
     public DbSet<CseMarketDaily> CseMarketDaily { get; set; } = null!;
     public DbSet<CseSecurity> CseSecurities { get; set; } = null!;
+    public DbSet<CseFinancialReport> CseFinancialReports { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -301,6 +302,13 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.ToTable("CseSecurities");
             entity.HasIndex(s => s.Symbol).IsUnique();
+        });
+
+        builder.Entity<CseFinancialReport>(entity =>
+        {
+            entity.ToTable("CseFinancialReports");
+            entity.HasIndex(r => r.CseReportId).IsUnique();
+            entity.HasIndex(r => new { r.Symbol, r.PeriodEnd });
         });
     }
 }

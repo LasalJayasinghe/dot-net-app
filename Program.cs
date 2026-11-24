@@ -183,6 +183,17 @@ builder.Services.AddSingleton<GlobalMarketStore>();
 builder.Services.AddScoped<GlobalMarketService>();
 builder.Services.AddHostedService<GlobalMarketsJob>();
 
+// CSE fundamentals (NAV, P/BV, trailing EPS, P/E, ROE…) read from interim-report PDFs on cdn.cse.lk.
+builder.Services.AddHttpClient<dotnetApp.Application.Services.Fundamentals.CseFundamentalsService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(120); // report PDFs run to ~1 MB
+    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json, application/pdf, */*");
+    client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+    client.DefaultRequestHeaders.TryAddWithoutValidation("Origin", "https://www.cse.lk");
+    client.DefaultRequestHeaders.TryAddWithoutValidation("Referer", "https://www.cse.lk/");
+});
+builder.Services.AddHostedService<CseFundamentalsJob>();
+
 // Named HttpClient for Binance REST API — no API keys needed for public endpoints
 builder.Services.AddHttpClient("binance", client =>
 {

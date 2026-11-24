@@ -616,6 +616,111 @@ namespace dotnetApp.Migrations
                     b.ToTable("WatchlistItems", (string)null);
                 });
 
+            modelBuilder.Entity("dotnetApp.Domain.Entities.CseFinancialReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("CseReportId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EpsEntity")
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<decimal?>("EpsLastFullYear")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("EpsQuarterCurrent")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("EpsQuarterPrior")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("EpsStatus")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("EpsYtdCurrent")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int?>("EpsYtdMonths")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("EpsYtdPrior")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime>("ExtractedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("ExtractorVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NavEntity")
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<decimal?>("NavFromEquity")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("NavPerShare")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("NavStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("PdfPath")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<DateOnly?>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("PublicFloatPercent")
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<long?>("SharesInIssue")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("UploadedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CseReportId")
+                        .IsUnique();
+
+                    b.HasIndex("Symbol", "PeriodEnd");
+
+                    b.ToTable("CseFinancialReports", (string)null);
+                });
+
             modelBuilder.Entity("dotnetApp.Domain.Entities.CseIndexDaily", b =>
                 {
                     b.Property<long>("Id")
