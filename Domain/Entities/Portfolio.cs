@@ -25,9 +25,17 @@ public class Portfolio
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// Uninvested cash in <see cref="BaseCurrency"/>: CSE buying power (LKR) or idle USDT on the exchange.
+    /// Moved by buys, sells, deposits and withdrawals; counts towards the portfolio's value.
+    /// </summary>
+    [Column(TypeName = "decimal(28,8)")]
+    public decimal CashBalance { get; set; }
+
     // Navigation properties
     public ApplicationUser User { get; set; } = null!;
     public ICollection<PortfolioHolding> Holdings { get; set; } = new List<PortfolioHolding>();
+    public ICollection<PortfolioTransaction> Transactions { get; set; } = new List<PortfolioTransaction>();
 }
 
 public enum PortfolioType

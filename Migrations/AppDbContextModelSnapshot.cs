@@ -373,6 +373,9 @@ namespace dotnetApp.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("varchar(10)");
 
+                    b.Property<decimal>("CashBalance")
+                        .HasColumnType("decimal(28,8)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
@@ -499,6 +502,61 @@ namespace dotnetApp.Migrations
                     b.HasIndex("UserId", "CapturedAt");
 
                     b.ToTable("PortfolioSnapshots", (string)null);
+                });
+
+            modelBuilder.Entity("PortfolioTransaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("CashBalanceAfter")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<decimal>("CashChange")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("ExecutedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("Fees")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<int>("PortfolioId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Price")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<decimal?>("RealizedProfitLoss")
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<string>("Symbol")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PortfolioId", "ExecutedAt");
+
+                    b.ToTable("PortfolioTransactions", (string)null);
                 });
 
             modelBuilder.Entity("Profile", b =>
@@ -1276,6 +1334,17 @@ namespace dotnetApp.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("PortfolioTransaction", b =>
+                {
+                    b.HasOne("Portfolio", "Portfolio")
+                        .WithMany("Transactions")
+                        .HasForeignKey("PortfolioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Portfolio");
+                });
+
             modelBuilder.Entity("Profile", b =>
                 {
                     b.HasOne("ApplicationUser", "User")
@@ -1322,6 +1391,8 @@ namespace dotnetApp.Migrations
             modelBuilder.Entity("Portfolio", b =>
                 {
                     b.Navigation("Holdings");
+
+                    b.Navigation("Transactions");
                 });
 #pragma warning restore 612, 618
         }

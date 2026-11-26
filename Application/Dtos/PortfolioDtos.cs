@@ -67,7 +67,10 @@ public class PortfolioDetailDto
     public string Type { get; set; } = null!;         // "Stocks" or "Crypto"
     public string BaseCurrency { get; set; } = null!;
     public string? Description { get; set; }
-    public decimal TotalValue { get; set; }           // Sum of all holding CurrentValues
+    public decimal TotalValue { get; set; }           // Holdings' current value + cash
+    public decimal HoldingsValue { get; set; }        // Sum of all holding CurrentValues
+    public decimal CashBalance { get; set; }          // Uninvested cash in BaseCurrency
+    public decimal RealizedProfitLoss { get; set; }   // Sum of realised P/L from recorded sells
     public decimal TotalCost { get; set; }            // Sum of Quantity * AverageBuyPrice (+ 1.12% buy fees for stocks)
     public decimal TotalProfitLoss { get; set; }
     public decimal TotalProfitLossPercent { get; set; }
@@ -99,7 +102,9 @@ public class PortfolioSummaryDto
     public string Type { get; set; } = null!;
     public string BaseCurrency { get; set; } = null!;
     public string? Description { get; set; }
-    public decimal TotalValue { get; set; }           // Native currency total
+    public decimal TotalValue { get; set; }           // Native currency total: holdings + cash
+    public decimal HoldingsValue { get; set; }
+    public decimal CashBalance { get; set; }
     public decimal TotalProfitLoss { get; set; }
     public decimal TotalProfitLossPercent { get; set; }
     public decimal TodayProfitLoss { get; set; }
@@ -114,6 +119,7 @@ public class NetWorthOverviewDto
     public decimal TotalNetWorthUsdt { get; set; }
     public decimal TotalProfitLossLkr { get; set; }
     public decimal TotalProfitLossUsdt { get; set; }
+    public decimal TotalCashLkr { get; set; }         // Uninvested cash across all portfolios, in LKR
     public decimal UsdtToLkrRate { get; set; }
     public decimal LkrToUsdtRate { get; set; }
     public List<PortfolioSummaryDto> Portfolios { get; set; } = new();
@@ -187,4 +193,63 @@ public class PortfolioInsightsDto
     public List<HoldingSignalsDto> Signals { get; set; } = new();
     public List<HoldingDividendDto> UpcomingDividends { get; set; } = new();
     public decimal ExpectedDividendIncome { get; set; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trades, cash and the transaction ledger
+// ─────────────────────────────────────────────────────────────────────────────
+
+public class TradeRequest
+{
+    /// <summary>"Buy" or "Sell".</summary>
+    public string Side { get; set; } = "Buy";
+    public string Symbol { get; set; } = null!;
+    public decimal Quantity { get; set; }
+
+    /// <summary>Trade price per unit in the portfolio's base currency, before fees.</summary>
+    public decimal Price { get; set; }
+
+    /// <summary>
+    /// Crypto only: the exchange fee in USDT (defaults to 0.1% of the trade). CSE trades always use the
+    /// standard 1.12% charges so cash and P/L match the rest of the app.
+    /// </summary>
+    public decimal? Fees { get; set; }
+
+    /// <summary>
+    /// Buy: pay from the cash balance (false = record a position you already had, cash untouched).
+    /// Sell: add the proceeds to cash.
+    /// </summary>
+    public bool UseCash { get; set; } = true;
+
+    public string? Notes { get; set; }
+}
+
+public class CashRequest
+{
+    /// <summary>"Deposit", "Withdraw" or "Set" (correct the balance to match the broker).</summary>
+    public string Action { get; set; } = "Deposit";
+    public decimal Amount { get; set; }
+    public string? Notes { get; set; }
+}
+
+public class UpdateHoldingRequest
+{
+    public decimal Quantity { get; set; }
+    public decimal AverageBuyPrice { get; set; }
+    public string? Notes { get; set; }
+}
+
+public class PortfolioTransactionDto
+{
+    public int Id { get; set; }
+    public string Type { get; set; } = null!;
+    public string? Symbol { get; set; }
+    public decimal? Quantity { get; set; }
+    public decimal? Price { get; set; }
+    public decimal Fees { get; set; }
+    public decimal CashChange { get; set; }
+    public decimal CashBalanceAfter { get; set; }
+    public decimal? RealizedProfitLoss { get; set; }
+    public string? Notes { get; set; }
+    public DateTime ExecutedAt { get; set; }
 }

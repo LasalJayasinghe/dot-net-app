@@ -82,7 +82,8 @@ public class PortfolioSnapshotService
             // A portfolio that holds something but prices at zero means the price feed
             // was unavailable (e.g. the Binance socket has not warmed up yet). Recording
             // that would punch a false crash into the graph, so skip it this cycle.
-            if (p.HoldingCount > 0 && p.TotalValue <= 0)
+            // HoldingsValue, not TotalValue: cash would mask a missing price feed.
+            if (p.HoldingCount > 0 && p.HoldingsValue <= 0)
             {
                 skipped++;
                 continue;

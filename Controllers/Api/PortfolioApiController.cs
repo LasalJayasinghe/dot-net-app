@@ -17,7 +17,11 @@ namespace dotnetApp.Controllers.Api;
 ///   PUT    /api/portfolios/{id}                  — Update portfolio name / description
 ///   DELETE /api/portfolios/{id}                  — Delete a portfolio
 ///   POST   /api/portfolios/{id}/holdings         — Add or update a holding (weighted average for re-buys)
+///   PUT    /api/portfolios/{id}/holdings/{hId}   — Correct a holding's quantity / average price
 ///   DELETE /api/portfolios/{id}/holdings/{hId}   — Remove a specific holding
+///   POST   /api/portfolios/{id}/trades           — Buy / sell (moves cash, records realised P/L)
+///   POST   /api/portfolios/{id}/cash             — Deposit / withdraw / set the cash balance
+///   GET    /api/portfolios/{id}/transactions     — The portfolio's ledger, newest first
 ///   GET    /api/portfolios/net-worth             — Aggregated net worth across all portfolios in display currency
 ///   GET    /api/portfolios/history               — Hourly value-over-time series (net worth, or one portfolio)
 ///   GET    /api/portfolios/{id}/insights         — Signals per holding + upcoming dividends (stocks)
@@ -219,6 +223,65 @@ public class PortfolioApiController : ControllerBase
 
         var (success, message, dto) = await _portfolioService.AddOrUpdateHoldingAsync(userId, id, req);
         return success ? Ok(dto) : NotFound(new { message });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Trades, cash, holding corrections and the ledger
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Buy or sell. Buys pay from cash unless UseCash is false (recording a position you already had);
+    /// sells add the net proceeds to cash and record realised P/L. Returns the updated portfolio.
+    /// </summary>
+    [HttpPost("{id:int}/trades")]
+    public async Task<IActionResult> Trade(int id, [FromBody] TradeRequest req)
+    {
+        var userId = _userManager.GetUserId(User);
+        if (userId == null) return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(req.Symbol)) return BadRequest(new { message = "Symbol is required." });
+        if (req.Quantity <= 0) return BadRequest(new { message = "Quantity must be greater than zero." });
+        if (req.Price <= 0) return BadRequest(new { message = "Price must be greater than zero." });
+        if (req.Fees < 0) return BadRequest(new { message = "Fees can't be negative." });
+
+        var (success, message, detail) = await _portfolioService.TradeAsync(userId, id, req);
+        return success ? Ok(detail) : BadRequest(new { message });
+    }
+
+    /// <summary>Deposit, withdraw, or set the cash balance ("Set" corrects it to match the broker).</summary>
+    [HttpPost("{id:int}/cash")]
+    public async Task<IActionResult> Cash(int id, [FromBody] CashRequest req)
+    {
+        var userId = _userManager.GetUserId(User);
+        if (userId == null) return Unauthorized();
+
+        var (success, message, detail) = await _portfolioService.ChangeCashAsync(userId, id, req);
+        return success ? Ok(detail) : BadRequest(new { message });
+    }
+
+    /// <summary>Correct a holding's quantity / average price. No cash moves; the old values stay in the ledger.</summary>
+    [HttpPut("{id:int}/holdings/{hId:int}")]
+    public async Task<IActionResult> UpdateHolding(int id, int hId, [FromBody] UpdateHoldingRequest req)
+    {
+        var userId = _userManager.GetUserId(User);
+        if (userId == null) return Unauthorized();
+
+        if (req.Quantity <= 0) return BadRequest(new { message = "Quantity must be greater than zero (remove the holding instead)." });
+        if (req.AverageBuyPrice < 0) return BadRequest(new { message = "Average buy price can't be negative." });
+
+        var (success, message, detail) = await _portfolioService.UpdateHoldingAsync(userId, id, hId, req);
+        return success ? Ok(detail) : NotFound(new { message });
+    }
+
+    /// <summary>The portfolio's ledger, newest first.</summary>
+    [HttpGet("{id:int}/transactions")]
+    public async Task<IActionResult> Transactions(int id, [FromQuery] int limit = 100)
+    {
+        var userId = _userManager.GetUserId(User);
+        if (userId == null) return Unauthorized();
+
+        var items = await _portfolioService.GetTransactionsAsync(userId, id, limit);
+        return items == null ? NotFound(new { message = "Portfolio not found." }) : Ok(items);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

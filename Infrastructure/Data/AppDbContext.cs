@@ -17,6 +17,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<WatchlistItem> WatchlistItems { get; set; } = null!;
     public DbSet<Portfolio> Portfolios { get; set; } = null!;
     public DbSet<PortfolioHolding> PortfolioHoldings { get; set; } = null!;
+    public DbSet<PortfolioTransaction> PortfolioTransactions { get; set; } = null!;
     public DbSet<PortfolioSnapshot> PortfolioSnapshots { get; set; } = null!;
     public DbSet<CurrencyExchangeRate> CurrencyExchangeRates { get; set; } = null!;
     public DbSet<OtpRecord> OtpRecords { get; set; } = null!;
@@ -136,6 +137,19 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne(p => p.User)
                 .WithMany(u => u.Portfolios)
                 .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── PortfolioTransaction ───────────────────────────────────────────────
+        builder.Entity<PortfolioTransaction>(entity =>
+        {
+            entity.ToTable("PortfolioTransactions");
+            entity.Property(t => t.Type).HasConversion<string>().HasMaxLength(30);
+            entity.HasIndex(t => new { t.PortfolioId, t.ExecutedAt });
+
+            entity.HasOne(t => t.Portfolio)
+                .WithMany(p => p.Transactions)
+                .HasForeignKey(t => t.PortfolioId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -47,7 +47,7 @@ public class PortfolioService
         _db.Portfolios.Add(portfolio);
         await _db.SaveChangesAsync();
 
-        return ToDetailDto(portfolio, new List<HoldingDto>(), Valuation.Empty);
+        return ToDetailDto(portfolio, new List<HoldingDto>(), Valuation.Empty, realizedProfitLoss: 0);
     }
 
     public async Task<List<PortfolioSummaryDto>> GetUserPortfoliosAsync(string userId, PortfolioType? filter = null)
@@ -81,7 +81,11 @@ public class PortfolioService
             .Select(h => BuildHoldingDto(h, portfolio.Type, quotes, valuation.Value, activity))
             .ToList();
 
-        return ToDetailDto(portfolio, holdingDtos, valuation);
+        var realized = await _db.PortfolioTransactions.AsNoTracking()
+            .Where(t => t.PortfolioId == portfolioId && t.RealizedProfitLoss != null)
+            .SumAsync(t => t.RealizedProfitLoss) ?? 0m;
+
+        return ToDetailDto(portfolio, holdingDtos, valuation, realized);
     }
 
     /// <summary>Cheap ownership check — no pricing, no holdings load.</summary>
@@ -150,6 +154,10 @@ public class PortfolioService
             });
         }
 
+        // A position added without paying from cash (e.g. one you already held).
+        Record(portfolio, PortfolioTransactionType.Buy, symbol, req.Quantity, req.AverageBuyPrice,
+            fees: 0, cashChange: 0, notes: req.Notes ?? "Added without using cash");
+
         await _db.SaveChangesAsync();
 
         // Return the holding DTO with current price (weight relative to the updated portfolio)
@@ -168,6 +176,9 @@ public class PortfolioService
 
         if (holding == null) return false;
 
+        Record(holding.Portfolio, PortfolioTransactionType.HoldingAdjustment, holding.Symbol, -holding.Quantity,
+            holding.AverageBuyPrice, fees: 0, cashChange: 0,
+            notes: $"Removed holding ({holding.Quantity:0.########} @ {holding.AverageBuyPrice:0.####})");
         _db.PortfolioHoldings.Remove(holding);
         await _db.SaveChangesAsync();
         return true;
@@ -196,6 +207,7 @@ public class PortfolioService
         decimal totalNetWorthUsdt = 0;
         decimal totalPnlLkr      = 0;
         decimal totalPnlUsdt     = 0;
+        decimal totalCashLkr     = 0;
         var summaries = new List<PortfolioSummaryDto>();
 
         foreach (var p in portfolios)
@@ -210,6 +222,7 @@ public class PortfolioService
             totalNetWorthUsdt += v.Value * rateToUsdt;
             totalPnlLkr       += v.ProfitLoss * rateToLkr;
             totalPnlUsdt      += v.ProfitLoss * rateToUsdt;
+            totalCashLkr      += v.Cash * rateToLkr;
 
             summaries.Add(ToSummaryDto(p, v));
         }
@@ -220,10 +233,231 @@ public class PortfolioService
             TotalNetWorthUsdt = totalNetWorthUsdt,
             TotalProfitLossLkr = totalPnlLkr,
             TotalProfitLossUsdt = totalPnlUsdt,
+            TotalCashLkr = totalCashLkr,
             UsdtToLkrRate = usdtToLkr,
             LkrToUsdtRate = lkrToUsdt,
             Portfolios = summaries
         };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Trades, cash and the ledger
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Binance spot fee used when a crypto trade doesn't state its own.</summary>
+    public const decimal DefaultCryptoFeeRate = 0.001m;
+
+    /// <summary>
+    /// Buy or sell. CSE trades use the standard 1.12% charges (the same ones the P/L uses); crypto uses
+    /// the given fee or 0.1%. Buys raise the holding at a weighted average and (by default) take the cost
+    /// from cash; sells reduce it, add the net proceeds to cash and record realised P/L.
+    /// </summary>
+    public async Task<(bool Success, string Message, PortfolioDetailDto? Detail)> TradeAsync(
+        string userId, int portfolioId, TradeRequest req)
+    {
+        var portfolio = await _db.Portfolios
+            .Include(p => p.Holdings)
+            .FirstOrDefaultAsync(p => p.Id == portfolioId && p.UserId == userId);
+        if (portfolio == null) return (false, "Portfolio not found.", null);
+
+        var isStock = portfolio.Type == PortfolioType.Stocks;
+        var symbol = req.Symbol.Trim().ToUpperInvariant();
+        var gross = req.Quantity * req.Price;
+        var holding = portfolio.Holdings.FirstOrDefault(h => h.Symbol == symbol);
+        var ccy = portfolio.BaseCurrency;
+
+        if (string.Equals(req.Side, "Buy", StringComparison.OrdinalIgnoreCase))
+        {
+            // Stocks keep the raw trade price as the average (fees are added in the valuation, as in
+            // ATrad); crypto folds the fee into the average so its P/L is after fees too.
+            decimal fees, cashCost, costAdded;
+            if (isStock)
+            {
+                cashCost = CseFees.CostWithBuyFees(gross);
+                fees = cashCost - gross;
+                costAdded = gross;
+            }
+            else
+            {
+                fees = req.Fees ?? Math.Round(gross * DefaultCryptoFeeRate, 8);
+                cashCost = gross + fees;
+                costAdded = cashCost;
+            }
+
+            if (req.UseCash && portfolio.CashBalance < cashCost)
+                return (false,
+                    $"Not enough cash: {ccy} {portfolio.CashBalance:#,0.##} available, this buy needs {ccy} {cashCost:#,0.##}. " +
+                    "Deposit first, or untick \"Pay from cash\" to record a position you already had.", null);
+
+            if (holding == null)
+            {
+                holding = new PortfolioHolding
+                {
+                    PortfolioId = portfolioId,
+                    Symbol = symbol,
+                    AssetType = isStock ? AssetType.Stock : AssetType.Crypto,
+                    Quantity = req.Quantity,
+                    AverageBuyPrice = costAdded / req.Quantity,
+                    Notes = req.Notes,
+                };
+                portfolio.Holdings.Add(holding);
+            }
+            else
+            {
+                var qty = holding.Quantity + req.Quantity;
+                holding.AverageBuyPrice = (holding.Quantity * holding.AverageBuyPrice + costAdded) / qty;
+                holding.Quantity = qty;
+                holding.UpdatedAt = DateTime.UtcNow;
+            }
+
+            var cashChange = req.UseCash ? -cashCost : 0;
+            portfolio.CashBalance += cashChange;
+            Record(portfolio, PortfolioTransactionType.Buy, symbol, req.Quantity, req.Price, fees, cashChange,
+                req.Notes ?? (req.UseCash ? null : "Added without using cash"));
+        }
+        else if (string.Equals(req.Side, "Sell", StringComparison.OrdinalIgnoreCase))
+        {
+            if (holding == null) return (false, $"You don't hold {symbol} in this portfolio.", null);
+            if (req.Quantity > holding.Quantity)
+                return (false, $"You hold {holding.Quantity:0.########} {symbol}; you can't sell {req.Quantity:0.########}.", null);
+
+            decimal fees, proceeds, costBasis;
+            if (isStock)
+            {
+                proceeds = CseFees.NetOfSale(gross);
+                fees = gross - proceeds;
+                costBasis = CseFees.CostWithBuyFees(req.Quantity * holding.AverageBuyPrice);
+            }
+            else
+            {
+                fees = req.Fees ?? Math.Round(gross * DefaultCryptoFeeRate, 8);
+                proceeds = gross - fees;
+                costBasis = req.Quantity * holding.AverageBuyPrice;
+            }
+
+            holding.Quantity -= req.Quantity;
+            holding.UpdatedAt = DateTime.UtcNow;
+            // Sold out (allowing for dust from fractional crypto amounts): drop the holding.
+            if (holding.Quantity <= 0.00000001m) _db.PortfolioHoldings.Remove(holding);
+
+            var cashChange = req.UseCash ? proceeds : 0;
+            portfolio.CashBalance += cashChange;
+            Record(portfolio, PortfolioTransactionType.Sell, symbol, req.Quantity, req.Price, fees, cashChange,
+                req.Notes, realized: proceeds - costBasis);
+        }
+        else
+        {
+            return (false, "Side must be Buy or Sell.", null);
+        }
+
+        await _db.SaveChangesAsync();
+        return (true, "Trade recorded.", await GetPortfolioDetailAsync(userId, portfolioId));
+    }
+
+    /// <summary>Deposit, withdraw, or set the cash balance to match the broker / exchange.</summary>
+    public async Task<(bool Success, string Message, PortfolioDetailDto? Detail)> ChangeCashAsync(
+        string userId, int portfolioId, CashRequest req)
+    {
+        var portfolio = await _db.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId && p.UserId == userId);
+        if (portfolio == null) return (false, "Portfolio not found.", null);
+
+        var ccy = portfolio.BaseCurrency;
+        PortfolioTransactionType type;
+        decimal change;
+        switch (req.Action.Trim().ToLowerInvariant())
+        {
+            case "deposit":
+                if (req.Amount <= 0) return (false, "Deposit amount must be greater than zero.", null);
+                type = PortfolioTransactionType.Deposit;
+                change = req.Amount;
+                break;
+            case "withdraw":
+                if (req.Amount <= 0) return (false, "Withdrawal amount must be greater than zero.", null);
+                if (req.Amount > portfolio.CashBalance)
+                    return (false, $"Only {ccy} {portfolio.CashBalance:#,0.##} is available to withdraw.", null);
+                type = PortfolioTransactionType.Withdrawal;
+                change = -req.Amount;
+                break;
+            case "set":
+                if (req.Amount < 0) return (false, "Cash balance can't be negative.", null);
+                type = PortfolioTransactionType.CashAdjustment;
+                change = req.Amount - portfolio.CashBalance;
+                if (change == 0) return (true, "Cash balance unchanged.", await GetPortfolioDetailAsync(userId, portfolioId));
+                break;
+            default:
+                return (false, "Action must be Deposit, Withdraw or Set.", null);
+        }
+
+        portfolio.CashBalance += change;
+        Record(portfolio, type, null, null, null, fees: 0, cashChange: change, req.Notes);
+        await _db.SaveChangesAsync();
+        return (true, "Cash updated.", await GetPortfolioDetailAsync(userId, portfolioId));
+    }
+
+    /// <summary>Corrects a holding's quantity / average price (no cash moves); the old values are kept in the ledger.</summary>
+    public async Task<(bool Success, string Message, PortfolioDetailDto? Detail)> UpdateHoldingAsync(
+        string userId, int portfolioId, int holdingId, UpdateHoldingRequest req)
+    {
+        var holding = await _db.PortfolioHoldings
+            .Include(h => h.Portfolio)
+            .FirstOrDefaultAsync(h => h.Id == holdingId && h.PortfolioId == portfolioId && h.Portfolio.UserId == userId);
+        if (holding == null) return (false, "Holding not found.", null);
+
+        var was = $"{holding.Quantity:0.########} @ {holding.AverageBuyPrice:0.####}";
+        Record(holding.Portfolio, PortfolioTransactionType.HoldingAdjustment, holding.Symbol,
+            req.Quantity - holding.Quantity, req.AverageBuyPrice, fees: 0, cashChange: 0,
+            req.Notes ?? $"Corrected from {was}");
+
+        holding.Quantity = req.Quantity;
+        holding.AverageBuyPrice = req.AverageBuyPrice;
+        holding.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return (true, "Holding updated.", await GetPortfolioDetailAsync(userId, portfolioId));
+    }
+
+    /// <summary>Newest first; null when the portfolio isn't the user's.</summary>
+    public async Task<List<PortfolioTransactionDto>?> GetTransactionsAsync(string userId, int portfolioId, int limit)
+    {
+        if (!await OwnsPortfolioAsync(userId, portfolioId)) return null;
+        return await _db.PortfolioTransactions.AsNoTracking()
+            .Where(t => t.PortfolioId == portfolioId)
+            .OrderByDescending(t => t.ExecutedAt).ThenByDescending(t => t.Id)
+            .Take(Math.Clamp(limit, 1, 500))
+            .Select(t => new PortfolioTransactionDto
+            {
+                Id = t.Id,
+                Type = t.Type.ToString(),
+                Symbol = t.Symbol,
+                Quantity = t.Quantity,
+                Price = t.Price,
+                Fees = t.Fees,
+                CashChange = t.CashChange,
+                CashBalanceAfter = t.CashBalanceAfter,
+                RealizedProfitLoss = t.RealizedProfitLoss,
+                Notes = t.Notes,
+                ExecutedAt = t.ExecutedAt,
+            })
+            .ToListAsync();
+    }
+
+    /// <summary>Adds a ledger entry. Call after changing CashBalance so CashBalanceAfter is right.</summary>
+    private void Record(
+        Portfolio portfolio, PortfolioTransactionType type, string? symbol, decimal? quantity, decimal? price,
+        decimal fees, decimal cashChange, string? notes, decimal? realized = null)
+    {
+        _db.PortfolioTransactions.Add(new PortfolioTransaction
+        {
+            PortfolioId = portfolio.Id,
+            Type = type,
+            Symbol = symbol,
+            Quantity = quantity,
+            Price = price,
+            Fees = Math.Round(fees, 8),
+            CashChange = Math.Round(cashChange, 8),
+            CashBalanceAfter = Math.Round(portfolio.CashBalance, 8),
+            RealizedProfitLoss = realized is { } r ? Math.Round(r, 8) : null,
+            Notes = notes is { Length: > 255 } ? notes[..255] : notes,
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -239,6 +473,8 @@ public class PortfolioService
         if (portfolio == null) return;
 
         // Remove existing holdings
+        Record(portfolio, PortfolioTransactionType.HoldingAdjustment, null, null, null, fees: 0, cashChange: 0,
+            notes: $"Holdings replaced from broker file ({portfolio.Holdings.Count} → {parsedHoldings.Count})");
         _db.PortfolioHoldings.RemoveRange(portfolio.Holdings);
 
         // Add new holdings from PDF
@@ -260,12 +496,15 @@ public class PortfolioService
     /// <summary>Current and previous-session price for one holding.</summary>
     private sealed record Quote(decimal Price, decimal PreviousClose, string? Name);
 
-    /// <summary>Portfolio totals. ProfitLoss is net of CSE selling charges for stock portfolios.</summary>
+    /// <summary>
+    /// Portfolio totals. Value = holdings + uninvested cash; Cost and ProfitLoss are about the holdings
+    /// (cash has no P/L). ProfitLoss is net of CSE selling charges for stock portfolios.
+    /// </summary>
     private sealed record Valuation(
-        decimal Value, decimal Cost, decimal ProfitLoss, decimal ProfitLossPercent,
+        decimal Value, decimal HoldingsValue, decimal Cash, decimal Cost, decimal ProfitLoss, decimal ProfitLossPercent,
         decimal TodayProfitLoss, decimal TodayProfitLossPercent)
     {
-        public static readonly Valuation Empty = new(0, 0, 0, 0, 0, 0);
+        public static readonly Valuation Empty = new(0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     /// <summary>Key into the quote map: CSE symbols are normalised ("COMB" → "COMB.N0000").</summary>
@@ -346,11 +585,15 @@ public class PortfolioService
         var pnl = isStock ? CseFees.NetOfSale(value) - cost : value - cost;
         var today = value - previousValue;
 
+        // Cash doesn't move day to day, but it is part of yesterday's portfolio value too.
+        var cash = p.CashBalance;
+        var previousTotal = previousValue + cash;
+
         return new Valuation(
-            value, cost, pnl,
+            value + cash, value, cash, cost, pnl,
             cost > 0 ? pnl / cost * 100 : 0,
             today,
-            previousValue > 0 ? today / previousValue * 100 : 0);
+            previousTotal > 0 ? today / previousTotal * 100 : 0);
     }
 
     private static HoldingDto BuildHoldingDto(
@@ -422,6 +665,8 @@ public class PortfolioService
         BaseCurrency           = p.BaseCurrency,
         Description            = p.Description,
         TotalValue             = Math.Round(v.Value, 4),
+        HoldingsValue          = Math.Round(v.HoldingsValue, 4),
+        CashBalance            = Math.Round(v.Cash, 4),
         TotalProfitLoss        = Math.Round(v.ProfitLoss, 4),
         TotalProfitLossPercent = Math.Round(v.ProfitLossPercent, 2),
         TodayProfitLoss        = Math.Round(v.TodayProfitLoss, 4),
@@ -430,7 +675,8 @@ public class PortfolioService
         CreatedAt              = p.CreatedAt
     };
 
-    private static PortfolioDetailDto ToDetailDto(Portfolio portfolio, List<HoldingDto> holdings, Valuation v)
+    private static PortfolioDetailDto ToDetailDto(
+        Portfolio portfolio, List<HoldingDto> holdings, Valuation v, decimal realizedProfitLoss)
         => new()
         {
             Id                     = portfolio.Id,
@@ -439,6 +685,9 @@ public class PortfolioService
             BaseCurrency           = portfolio.BaseCurrency,
             Description            = portfolio.Description,
             TotalValue             = Math.Round(v.Value, 4),
+            HoldingsValue          = Math.Round(v.HoldingsValue, 4),
+            CashBalance            = Math.Round(v.Cash, 4),
+            RealizedProfitLoss     = Math.Round(realizedProfitLoss, 4),
             TotalCost              = Math.Round(v.Cost, 4),
             TotalProfitLoss        = Math.Round(v.ProfitLoss, 4),
             TotalProfitLossPercent = Math.Round(v.ProfitLossPercent, 2),
