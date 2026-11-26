@@ -37,11 +37,17 @@ namespace dotnetApp.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<bool>("FireOnce")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<bool>("IsAbove")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("LastTriggeredAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
@@ -655,6 +661,13 @@ namespace dotnetApp.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+                    b.Property<string>("Market")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)")
+                        .HasDefaultValue("Cse");
 
                     b.Property<string>("Symbol")
                         .IsRequired()

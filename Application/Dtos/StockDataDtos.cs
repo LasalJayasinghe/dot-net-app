@@ -60,7 +60,33 @@ public class TradeSummaryItemDto
     public long ShareVolume { get; set; }
     public long TradeVolume { get; set; }
     public decimal Turnover { get; set; }
+
+    /// <summary>Today's opening price (0 before the first trade).</summary>
+    public decimal Open { get; set; }
+
+    /// <summary>CSE sends this in exponent form (5.09522832E9), so it is read as a double.</summary>
+    public double MarketCap { get; set; }
+
+    /// <summary>Epoch milliseconds of the last trade; null when it hasn't traded.</summary>
+    public long? LastTradedTime { get; set; }
 }
+
+/// <summary>One stock's row on the full market board, from the latest tradeSummary poll.</summary>
+public record CseBoardRow(
+    string Symbol,
+    string Name,
+    decimal Price,
+    decimal Change,
+    decimal PercentageChange,
+    decimal Open,
+    decimal High,
+    decimal Low,
+    decimal PreviousClose,
+    long ShareVolume,
+    long TradeVolume,
+    decimal Turnover,
+    decimal MarketCap,
+    DateTime? LastTradedAt);
 
 /// <summary>Today's trading activity for one CSE security, from the latest tradeSummary poll.</summary>
 public record StockActivityDto(

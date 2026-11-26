@@ -151,6 +151,20 @@ public class StockService
                         StringComparer.OrdinalIgnoreCase),
                 TimeSpan.FromDays(1));
 
+            // The full market board (every security, all of today's figures) for the trading desk.
+            _cache.Set(BoardCacheKey,
+                new CseBoardSnapshot(DateTime.UtcNow, stockItems.ReqTradeSummery
+                    .Where(i => !string.IsNullOrEmpty(i.Symbol))
+                    .GroupBy(i => i.Symbol, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .Select(i => new CseBoardRow(
+                        i.Symbol, i.Name, i.Price, i.Change, i.PercentageChange, i.Open, i.High, i.Low,
+                        i.PreviousClose, i.ShareVolume, i.TradeVolume, i.Turnover,
+                        double.IsFinite(i.MarketCap) ? (decimal)i.MarketCap : 0m,
+                        i.LastTradedTime is > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(i.LastTradedTime.Value).UtcDateTime : null))
+                    .ToList()),
+                TimeSpan.FromDays(1));
+
             // CSE's internal ids are needed for chart history lookups.
             _cache.Set(StockIdsCacheKey,
                 stockItems.ReqTradeSummery
@@ -222,6 +236,17 @@ public class StockService
 
     private const string StockIdsCacheKey = "cse-stock-ids";
     private const string ActivityCacheKey = "cse-activity";
+    private const string BoardCacheKey = "cse-board";
+
+    /// <summary>The whole market from the last tradeSummary poll, and when it was taken.</summary>
+    public sealed record CseBoardSnapshot(DateTime TakenAt, IReadOnlyList<CseBoardRow> Rows);
+
+    /// <summary>
+    /// Every security's figures from the last tradeSummary poll (AlertJob refreshes it while the market
+    /// is open). Null if nothing has been fetched yet — never calls CSE.
+    /// </summary>
+    public CseBoardSnapshot? GetCachedBoard() =>
+        _cache.TryGetValue(BoardCacheKey, out CseBoardSnapshot? board) ? board : null;
 
     /// <summary>
     /// Today's volume/turnover per symbol from the last tradeSummary poll (AlertJob refreshes it every

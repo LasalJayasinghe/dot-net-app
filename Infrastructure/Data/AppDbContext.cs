@@ -111,6 +111,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
                 .IsRequired()
                 .HasMaxLength(20);
 
+            entity.Property(w => w.Market)
+                .IsRequired()
+                .HasMaxLength(10)
+                .HasDefaultValue(WatchlistMarkets.Cse);
+
             entity.Property(w => w.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 

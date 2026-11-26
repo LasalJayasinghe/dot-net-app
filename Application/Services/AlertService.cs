@@ -33,8 +33,8 @@ public class AlertService
     }
 
     /// <summary>
-    /// Sends Telegram + push for every active alert whose condition holds. Alerts stay active, so an alert
-    /// keeps notifying on each pass while the condition holds (intended behaviour).
+    /// Sends Telegram + push for every active alert whose condition holds. A fire-once alert is then
+    /// switched off; any other alert keeps notifying on each pass while the condition holds.
     /// </summary>
     public async Task MonitorAlertsAsync(AlertScope scope, CancellationToken stoppingToken)
     {
@@ -98,6 +98,15 @@ public class AlertService
                         ["targetPrice"] = alert.TargetPrice,
                     },
                     stoppingToken);
+
+                // Record the trigger; fire-once alerts switch themselves off so they notify only once.
+                var firedAt = DateTime.UtcNow;
+                await _dbContext.Alerts
+                    .Where(a => a.Id == alert.Id)
+                    .ExecuteUpdateAsync(set => set
+                        .SetProperty(a => a.LastTriggeredAt, firedAt)
+                        .SetProperty(a => a.IsActive, a => a.FireOnce ? false : a.IsActive),
+                        stoppingToken);
 
                 Console.WriteLine($"Alert triggered for {alert.Symbol} at {now}.");
             }

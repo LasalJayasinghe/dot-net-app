@@ -194,6 +194,10 @@ builder.Services.AddHttpClient<dotnetApp.Application.Services.Fundamentals.CseFu
 });
 builder.Services.AddHostedService<CseFundamentalsJob>();
 
+// Trading desk: intraday ASPI series (written by AlertJob) and the desk's aggregation service.
+builder.Services.AddSingleton<dotnetApp.Application.Services.Desk.MarketIntradayStore>();
+builder.Services.AddScoped<dotnetApp.Application.Services.Desk.DeskService>();
+
 // Named HttpClient for Binance REST API — no API keys needed for public endpoints
 builder.Services.AddHttpClient("binance", client =>
 {

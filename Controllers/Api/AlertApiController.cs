@@ -37,6 +37,8 @@ public class AlertApiController : ControllerBase
             currentPrice,
             isAbove = alert.IsAbove,
             isActive = alert.IsActive,
+            fireOnce = alert.FireOnce,
+            lastTriggeredAt = alert.LastTriggeredAt,
             createdAt = alert.CreatedAt,
             // "Stock" | "Index" | "Crypto" | "Fx" (index/crypto/FX symbols: ASPI, SNPSL20, BTCUSDT, SOLUSDT, USDTLKR)
             assetType = MarketPriceResolver.AssetTypeOf(alert.Symbol).ToString(),
@@ -54,15 +56,21 @@ public class AlertApiController : ControllerBase
         return prices.TryGetValue(symbol, out var price) ? price : null;
     }
 
+    /// <summary>The user's alerts, newest first; <paramref name="symbol"/> narrows to one symbol (the desk's quick-alert popover).</summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] string? symbol = null)
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
 
-        var alerts = await _dbContext.Alerts
-            .AsNoTracking()
-            .Where(a => a.CreatedBy == user.Id)
+        var query = _dbContext.Alerts.AsNoTracking().Where(a => a.CreatedBy == user.Id);
+        if (!string.IsNullOrWhiteSpace(symbol))
+        {
+            var normalized = MarketPriceResolver.Normalize(symbol);
+            query = query.Where(a => a.Symbol == normalized);
+        }
+
+        var alerts = await query
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
 
@@ -95,6 +103,7 @@ public class AlertApiController : ControllerBase
             TargetPrice = vm.TargetPrice,
             IsAbove = vm.IsAbove,
             IsActive = vm.IsActive,
+            FireOnce = vm.FireOnce,
             CreatedBy = user.Id,
             CreatedAt = DateTime.UtcNow
         };
@@ -128,6 +137,7 @@ public class AlertApiController : ControllerBase
         alert.TargetPrice = vm.TargetPrice;
         alert.IsAbove = vm.IsAbove;
         alert.IsActive = vm.IsActive;
+        if (vm.FireOnce is { } fireOnce) alert.FireOnce = fireOnce;
 
         await _dbContext.SaveChangesAsync();
 

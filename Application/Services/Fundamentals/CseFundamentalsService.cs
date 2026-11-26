@@ -268,6 +268,29 @@ public class CseFundamentalsService
     }
 
     /// <summary>
+    /// Latest NAV per share and trailing EPS for many symbols from stored reports only (no cse.lk calls),
+    /// for P/BV and P/E on a list of stocks. Missing symbols are absent from the result.
+    /// </summary>
+    public async Task<Dictionary<string, (decimal? Nav, decimal? EpsTtm)>> GetValuationInputsAsync(
+        IEnumerable<string> symbols, CancellationToken ct = default)
+    {
+        var lookups = symbols.Select(CseSymbols.ToLookup).Distinct().ToList();
+        var rows = await _db.CseFinancialReports.AsNoTracking()
+            .Where(r => lookups.Contains(r.Symbol) && r.Error == null)
+            .ToListAsync(ct);
+
+        var result = new Dictionary<string, (decimal? Nav, decimal? EpsTtm)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var g in rows.GroupBy(r => r.Symbol))
+        {
+            var ordered = g.OrderByDescending(r => r.PeriodEnd).ThenByDescending(r => r.UploadedAt).ToList();
+            var nav = ordered.FirstOrDefault(r => r.NavPerShare is > 0)?.NavPerShare;
+            var (ttm, _, _) = TrailingEps(ordered);
+            result[g.Key] = (nav, ttm);
+        }
+        return result;
+    }
+
+    /// <summary>
     /// Trailing 12-month EPS = this year-to-date + last full year − the same year-to-date a year earlier.
     /// A year-end report (12-month YTD) is already trailing.
     /// </summary>

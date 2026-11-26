@@ -31,6 +31,12 @@ public class MarketPriceResolver
         [SnpSl20] = new(SnpSl20, "S&P SL20 Index", AlertAssetType.Index, "pts", 2),
         [BtcUsdt] = new(BtcUsdt, "BTC/USDT", AlertAssetType.Crypto, "USDT", 2),
         [SolUsdt] = new(SolUsdt, "SOL/USDT", AlertAssetType.Crypto, "USDT", 4),
+        // The rest of BinanceService.TrackedSymbols, so every pair on the trading desk can be alerted.
+        ["ETHUSDT"] = new("ETHUSDT", "ETH/USDT", AlertAssetType.Crypto, "USDT", 2),
+        ["BNBUSDT"] = new("BNBUSDT", "BNB/USDT", AlertAssetType.Crypto, "USDT", 2),
+        ["XRPUSDT"] = new("XRPUSDT", "XRP/USDT", AlertAssetType.Crypto, "USDT", 4),
+        ["ADAUSDT"] = new("ADAUSDT", "ADA/USDT", AlertAssetType.Crypto, "USDT", 4),
+        ["DOGEUSDT"] = new("DOGEUSDT", "DOGE/USDT", AlertAssetType.Crypto, "USDT", 5),
         [UsdtLkr] = new(UsdtLkr, "USDT/LKR", AlertAssetType.Fx, "LKR", 2),
     };
 

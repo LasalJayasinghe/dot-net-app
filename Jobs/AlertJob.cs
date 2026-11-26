@@ -1,11 +1,14 @@
 using dotnetApp;
+using dotnetApp.Application.Services.Desk;
 using Microsoft.Extensions.Hosting;
 
 public class AlertJob : BackgroundService
 {
-    private static readonly TimeSpan TickInterval = TimeSpan.FromMinutes(1);
+    // Short tick so the open-market price cadence (default 30 s) is honoured.
+    private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(10);
 
-    private static readonly TimeSpan OpenPriceInterval = TimeSpan.FromMinutes(2);
+    /// <summary>Default for Cse:OpenPollSeconds — how often prices and indices refresh while the market is open.</summary>
+    private const int DefaultOpenPollSeconds = 30;
     private static readonly TimeSpan OpenMarketDataInterval = TimeSpan.FromMinutes(5);
 
     private static readonly TimeSpan ClosedStatusInterval = TimeSpan.FromMinutes(15);
@@ -15,10 +18,20 @@ public class AlertJob : BackgroundService
     private static readonly TimeSpan MarketAlertInterval = TimeSpan.FromMinutes(2);
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly MarketIntradayStore _intraday;
 
-    public AlertJob(IServiceScopeFactory scopeFactory)
+    /// <summary>
+    /// Price + index refresh while the market is open (one tradeSummary call covers every stock).
+    /// Raise Cse:OpenPollSeconds if cse.lk ever throttles us; never below 15 s.
+    /// </summary>
+    private readonly TimeSpan _openPriceInterval;
+
+    public AlertJob(IServiceScopeFactory scopeFactory, MarketIntradayStore intraday, IConfiguration configuration)
     {
         _scopeFactory = scopeFactory;
+        _intraday = intraday;
+        _openPriceInterval = TimeSpan.FromSeconds(
+            Math.Max(15, configuration.GetValue("Cse:OpenPollSeconds", DefaultOpenPollSeconds)));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -51,15 +64,17 @@ public class AlertJob : BackgroundService
                     }
                 }
 
-                if (now - lastIndexUpdate >= (isOpen ? OpenMarketDataInterval : ClosedDataInterval))
+                // While open, indices refresh with prices so the desk's intraday ASPI line is fine-grained.
+                if (now - lastIndexUpdate >= (isOpen ? _openPriceInterval : ClosedDataInterval))
                 {
-                    await stockService.GetASPIData();
-                    await stockService.GetSnpData();
+                    var aspi = await stockService.GetASPIData();
+                    var snp = await stockService.GetSnpData();
+                    if (isOpen && aspi != null) _intraday.Append(aspi.value, snp.value);
                     lastIndexUpdate = now;
                 }
 
                 // Alerts compare against saved prices, so the summary must run first.
-                if (now - lastPriceUpdate >= (isOpen ? OpenPriceInterval : ClosedDataInterval))
+                if (now - lastPriceUpdate >= (isOpen ? _openPriceInterval : ClosedDataInterval))
                 {
                     await stockService.GetTradingSummaryAsync();
                     await alertService.MonitorAlertsAsync(AlertScope.Cse, stoppingToken);

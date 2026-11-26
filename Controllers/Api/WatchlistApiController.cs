@@ -13,27 +13,56 @@ public class WatchlistApiController : ControllerBase
 {
     private readonly StockService _stockService;
     private readonly AppDbContext _dbContext;
+    private readonly BinanceService _binance;
 
-    public WatchlistApiController(StockService stockService, AppDbContext dbContext)
+    public WatchlistApiController(StockService stockService, AppDbContext dbContext, BinanceService binance)
     {
         _stockService = stockService;
         _dbContext = dbContext;
+        _binance = binance;
     }
 
+    /// <summary>
+    /// The user's watchlist with current prices. <paramref name="market"/>: "cse" (default, so existing
+    /// screens see only stocks), "crypto" or "all".
+    /// </summary>
     [HttpGet]
-    public async Task<IActionResult> Get()
+    public async Task<IActionResult> Get([FromQuery] string? market = null)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
             return Unauthorized(new { message = "Invalid token - user id missing" });
 
-        var symbols = await _dbContext.WatchlistItems
+        var scope = (market ?? "cse").Trim().ToLowerInvariant();
+        var items = await _dbContext.WatchlistItems
             .Where(w => w.UserId == userId)
-            .Select(w => w.Symbol)
+            .Select(w => new { w.Symbol, w.Market })
             .ToListAsync();
 
+        var results = new List<object>(items.Count);
+
+        if (scope is "crypto" or "all")
+        {
+            foreach (var c in items.Where(i => i.Market == WatchlistMarkets.Crypto))
+            {
+                var t = _binance.GetTicker(c.Symbol);
+                results.Add(new
+                {
+                    symbol = c.Symbol,
+                    market = WatchlistMarkets.Crypto,
+                    price = t?.LastPrice ?? 0,
+                    changePct = t?.PriceChangePercent ?? 0,
+                    high = t?.High24h ?? 0,
+                    low = t?.Low24h ?? 0,
+                });
+            }
+        }
+
+        var symbols = scope is "cse" or "all"
+            ? items.Where(i => i.Market == WatchlistMarkets.Cse).Select(i => i.Symbol).ToList()
+            : new List<string>();
         if (symbols.Count == 0)
-            return Ok(Array.Empty<object>());
+            return Ok(results);
 
         // Prices come from the Stocks table, which AlertJob refreshes from CSE's tradeSummary every
         // 2 minutes during market hours. Only symbols missing from it fall back to a live CSE call.
@@ -49,7 +78,6 @@ public class WatchlistApiController : ControllerBase
         foreach (var l in lookups.Where(l => !stored.ContainsKey(l)))
             live[l] = await _stockService.GetStockDataAsync(l);
 
-        var results = new List<object>(symbols.Count);
         foreach (var lookup in lookups)
         {
             if (stored.TryGetValue(lookup, out var s))
@@ -57,6 +85,7 @@ public class WatchlistApiController : ControllerBase
                 results.Add(new
                 {
                     symbol = s.Symbol,
+                    market = WatchlistMarkets.Cse,
                     price = s.Price,
                     changePct = s.PercentageChange,
                     high = s.High,
@@ -70,6 +99,7 @@ public class WatchlistApiController : ControllerBase
             results.Add(new
             {
                 symbol = data.ReqSymbolInfo.Symbol,
+                market = WatchlistMarkets.Cse,
                 price = data.ReqSymbolInfo.LastTradedPrice,
                 changePct = data.ReqSymbolInfo.PercentageChange,
                 high = data.ReqSymbolInfo.High,
@@ -91,13 +121,41 @@ public class WatchlistApiController : ControllerBase
         if (string.IsNullOrWhiteSpace(symbol))
             return BadRequest(new { message = "Symbol is required" });
 
+        // Crypto: one of the Binance pairs the app streams (BTCUSDT, ETHUSDT…).
+        var isCrypto = string.Equals(dto.Market, WatchlistMarkets.Crypto, StringComparison.OrdinalIgnoreCase)
+                       || BinanceService.TrackedSymbols.Contains(symbol);
+        if (isCrypto)
+        {
+            if (!BinanceService.TrackedSymbols.Contains(symbol))
+                return BadRequest(new { message = $"{symbol} isn't one of the tracked pairs ({string.Join(", ", BinanceService.TrackedSymbols)})." });
+            if (await _dbContext.WatchlistItems.AnyAsync(w => w.UserId == userId && w.Symbol == symbol))
+                return Conflict(new { message = "Symbol already in watchlist" });
+
+            _dbContext.WatchlistItems.Add(new WatchlistItem { UserId = userId, Symbol = symbol, Market = WatchlistMarkets.Crypto });
+            await _dbContext.SaveChangesAsync();
+            var t = _binance.GetTicker(symbol);
+            return Ok(new
+            {
+                symbol,
+                market = WatchlistMarkets.Crypto,
+                price = t?.LastPrice ?? 0,
+                changePct = t?.PriceChangePercent ?? 0,
+                high = t?.High24h ?? 0,
+                low = t?.Low24h ?? 0,
+            });
+        }
+
         var data = await _stockService.GetStockDataAsync(ToLookupSymbol(symbol));
         if (data == null)
             return BadRequest(new { message = "Stock not found" });
 
-        var exists = await _dbContext.WatchlistItems
-            .AnyAsync(w => w.UserId == userId && w.Symbol == symbol);
-        if (exists)
+        // "COMB" and "COMB.N0000" are the same stock.
+        var lookup = ToLookupSymbol(symbol);
+        var existing = await _dbContext.WatchlistItems
+            .Where(w => w.UserId == userId && w.Market == WatchlistMarkets.Cse)
+            .Select(w => w.Symbol)
+            .ToListAsync();
+        if (existing.Any(e => ToLookupSymbol(e) == lookup))
             return Conflict(new { message = "Symbol already in watchlist" });
 
         _dbContext.WatchlistItems.Add(new WatchlistItem
@@ -110,6 +168,7 @@ public class WatchlistApiController : ControllerBase
         return Ok(new
         {
             symbol = data.ReqSymbolInfo.Symbol,
+            market = WatchlistMarkets.Cse,
             price = data.ReqSymbolInfo.LastTradedPrice,
             changePct = data.ReqSymbolInfo.PercentageChange,
             high = data.ReqSymbolInfo.High,
@@ -125,8 +184,11 @@ public class WatchlistApiController : ControllerBase
             return Unauthorized(new { message = "Invalid token - user id missing" });
 
         var cleanSymbol = (symbol ?? string.Empty).Trim().ToUpperInvariant();
-        var item = await _dbContext.WatchlistItems
-            .FirstOrDefaultAsync(w => w.UserId == userId && w.Symbol == cleanSymbol);
+        // Exact match first; CSE codes also match their other form ("COMB" ↔ "COMB.N0000").
+        var items = await _dbContext.WatchlistItems.Where(w => w.UserId == userId).ToListAsync();
+        var item = items.FirstOrDefault(w => w.Symbol == cleanSymbol)
+                   ?? items.FirstOrDefault(w => w.Market == WatchlistMarkets.Cse &&
+                                                ToLookupSymbol(w.Symbol) == ToLookupSymbol(cleanSymbol));
 
         if (item == null)
             return NotFound(new { message = "Symbol not found in watchlist" });
@@ -142,5 +204,8 @@ public class WatchlistApiController : ControllerBase
     public class AddWatchlistDto
     {
         public string? Symbol { get; set; }
+
+        /// <summary>"Cse" (default) or "Crypto". Tracked Binance pairs are detected without it.</summary>
+        public string? Market { get; set; }
     }
 }

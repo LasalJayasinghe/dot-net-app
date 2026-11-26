@@ -18,6 +18,9 @@ public class AlertCreateViewModel
     [Display(Name = "Is Active?")]
     public bool IsActive { get; set; } = true;
 
+    /// <summary>Notify once, then switch off (default). False = notify on every pass while true.</summary>
+    public bool FireOnce { get; set; } = true;
+
     public List<Stock> StockNames { get; set; } = new();
 
 }
@@ -35,6 +38,9 @@ public class AlertEditViewModel
 
     [Display(Name = "Is Active?")]
     public bool IsActive { get; set; } = true;
+
+    /// <summary>Null leaves the alert's setting unchanged (older clients don't send it).</summary>
+    public bool? FireOnce { get; set; }
 
     public List<Stock> StockNames { get; set; } = new();
 
